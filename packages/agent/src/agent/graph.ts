@@ -1,3 +1,4 @@
+import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
@@ -76,6 +77,10 @@ async function runGeminiAgent(ctx: AgentContext, messageText: string): Promise<s
 
   const preamble = buildContextPreamble(ctx);
 
+  console.log(
+    `[agent] → sender=${ctx.senderFullName} role=${ctx.senderRole} resolved=${ctx.resolvedStudentName ?? "<unresolved>"} | "${messageText}"`,
+  );
+
   const result = await agent.invoke(
     {
       messages: [
@@ -84,7 +89,8 @@ async function runGeminiAgent(ctx: AgentContext, messageText: string): Promise<s
       ],
     },
     {
-      recursionLimit: 10, // allows ~4 tool-call iterations
+      recursionLimit: 10,
+      callbacks: [new AgentTraceHandler()],
     },
   );
 
@@ -94,6 +100,58 @@ async function runGeminiAgent(ctx: AgentContext, messageText: string): Promise<s
   if (typeof content === "string") return content;
   // Fallback for multi-part content — stringify
   return JSON.stringify(content);
+}
+
+// ---------------------------------------------------------------------------
+// Debug: stream tool-call + LLM events to stdout for easy observation
+// ---------------------------------------------------------------------------
+
+class AgentTraceHandler extends BaseCallbackHandler {
+  name = "AgentTraceHandler";
+
+  handleToolStart(
+    tool: { name?: string } | Record<string, unknown>,
+    input: string,
+  ): Promise<void> {
+    const name =
+      (tool as { name?: string }).name ??
+      (tool as { id?: string[] }).id?.slice(-1)[0] ??
+      "<unknown tool>";
+    let args = input;
+    if (args && args.length > 200) args = `${args.slice(0, 200)}… (truncated)`;
+    console.log(`[agent] 🛠  tool call: ${name}(${args})`);
+    return Promise.resolve();
+  }
+
+  handleToolEnd(output: unknown): Promise<void> {
+    let s = typeof output === "string" ? output : JSON.stringify(output);
+    if (s && s.length > 300) s = `${s.slice(0, 300)}… (truncated)`;
+    console.log(`[agent] ✔  tool result: ${s}`);
+    return Promise.resolve();
+  }
+
+  handleToolError(err: Error): Promise<void> {
+    console.log(`[agent] ✖  tool error: ${err.message}`);
+    return Promise.resolve();
+  }
+
+  handleLLMEnd(output: {
+    generations?: Array<Array<{ text?: string; message?: { tool_calls?: unknown[] } }>>;
+  }): Promise<void> {
+    const gen = output.generations?.[0]?.[0];
+    const toolCalls = gen?.message?.tool_calls;
+    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+      console.log(
+        `[agent] 🤖 LLM → ${toolCalls.length} tool call(s): ${toolCalls
+          .map((t) => (t as { name?: string }).name ?? "?")
+          .join(", ")}`,
+      );
+    } else if (gen?.text) {
+      const preview = gen.text.length > 200 ? `${gen.text.slice(0, 200)}…` : gen.text;
+      console.log(`[agent] 🤖 LLM → final text: ${preview}`);
+    }
+    return Promise.resolve();
+  }
 }
 
 /**

@@ -9,6 +9,11 @@
 export { runAgent } from "./agent/graph.js";
 export type { AgentRunOutcome } from "./agent/graph.js";
 
+// Post-agent formatter: takes the raw agent reply + original question and
+// produces a WhatsApp-natural version via a second Gemini call. Safe no-op
+// under MOCK_LLM or when GEMINI_API_KEY is absent.
+export { formatForWhatsApp } from "./agent/formatter.js";
+
 // Sender context — useful for logging / observability on the webhook side.
 export { loadAgentContext } from "./agent/context.js";
 export type { AgentContext, LoadContextOutcome } from "./agent/context.js";
