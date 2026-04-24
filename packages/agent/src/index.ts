@@ -38,11 +38,33 @@ export {
   getStudentIdentitiesByIds,
   resolveStudentFromName,
   canCallerAccessStudent,
+  upsertAdmissionsIntake,
 } from "./db/queries/index.js";
 
 // Shared result envelope.
 export type { Result, ErrorCode } from "./db/queries/result.js";
+export type {
+  UpsertAdmissionsIntakeInput,
+  UpsertAdmissionsIntakeOutput,
+} from "./db/queries/admissions.js";
 
 // Environment loader — exposed so the backend can read MOCK_LLM etc. via the
 // same typed view (rather than re-parsing process.env separately).
 export { env } from "./config/env.js";
+
+// Admissions kiosk Phase 2 — question generation + Learning DNA analysis.
+export {
+  AdmissionProfileSchema,
+  AdmissionQuestionSchema,
+  CandidateResponseSchema,
+  generateAdmissionsQuestions,
+  analyzeAdmissionsResponses,
+} from "./admissions/phase2.js";
+export type {
+  AdmissionProfile,
+  AdmissionQuestion,
+  CandidateResponse,
+  AdmissionsQuestionSet,
+  AdmissionsEvaluation,
+  LearningDnaAnalysis,
+} from "./admissions/phase2.js";

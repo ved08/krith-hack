@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { env as agentEnv } from "@campus/agent";
 import { Hono } from "hono";
 import { env } from "./env.js";
+import { admissionsRouter } from "./routes/admissions.js";
 import { agentRouter } from "./routes/agent.js";
 import { webhookRouter } from "./routes/webhook.js";
 
@@ -15,6 +16,9 @@ app.route("/", webhookRouter);
 
 // JSON entrypoint for dashboards and curl-based testing.
 app.route("/", agentRouter);
+
+// Admissions kiosk (Phase 2) LLM endpoints.
+app.route("/", admissionsRouter);
 
 serve({ fetch: app.fetch, port: env.PORT });
 
