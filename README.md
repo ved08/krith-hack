@@ -51,8 +51,84 @@ import { insertAttendanceBatch } from "@campus/agent/db";
 | `/health` | GET | — | JSON | anyone |
 | `/webhook` | POST | `application/x-www-form-urlencoded` (Twilio: `From`, `Body`, …) | TwiML (`text/xml`) | Twilio WhatsApp |
 | `/agent/message` | POST | `{fromPhoneE164, messageText}` JSON | `{success, data:{reply, canned}}` | dashboard, curl |
+| `/admissions/phase2/intake` | POST | `{schoolId, classroomId, profile, parentUsername?, studentUsername?, generateQuestions?, questionCount?}` JSON | `{success, data:{intake, questionSet?}}` | admissions kiosk frontend |
+| `/admissions/phase2/questions` | POST | `{profile, questionCount?}` JSON | `{success, data:{questionSetId, generatedAtIso, model, profile, gradeBand, rationale, questions[]}}` | admissions kiosk frontend |
+| `/admissions/phase2/analyze` | POST | `{profile, responses[]}` JSON | `{success, data:{evaluatedAtIso, model, profile, responseCount, analysis}}` | admissions kiosk frontend |
 
 `/webhook` returns TwiML so Twilio auto-sends the reply back to the user — no Twilio API credentials required on the reply path.
+
+## Admissions kiosk payload examples
+
+### 1) Save admissions intake and generate question set
+
+```json
+{
+    "schoolId": 1,
+    "classroomId": 1,
+    "profile": {
+        "studentName": "Aarav Kumar",
+        "parentName": "Neha Kumar",
+        "parentPhoneE164": "+919876543210",
+        "studentPhoneE164": "+919876543211",
+        "currentClass": "Class 6",
+        "schoolName": "Sunrise Public School",
+        "preferredLanguage": "English"
+    },
+    "generateQuestions": true,
+    "questionCount": 8
+}
+```
+
+This call writes to `users`, `parent_student_link`, and `classroom_membership` using idempotent upserts.
+
+### 2) Generate class-based questions only (no DB write)
+
+```json
+{
+    "profile": {
+        "studentName": "Aarav Kumar",
+        "parentName": "Neha Kumar",
+        "parentPhoneE164": "+919876543210",
+        "studentPhoneE164": "+919876543211",
+        "currentClass": "Class 6",
+        "schoolName": "Sunrise Public School",
+        "preferredLanguage": "English"
+    },
+    "questionCount": 8
+}
+```
+
+### 3) Submit answers for Learning DNA analysis
+
+```json
+{
+    "profile": {
+        "studentName": "Aarav Kumar",
+        "parentName": "Neha Kumar",
+        "parentPhoneE164": "+919876543210",
+        "studentPhoneE164": "+919876543211",
+        "currentClass": "Class 6",
+        "schoolName": "Sunrise Public School",
+        "preferredLanguage": "English"
+    },
+    "responses": [
+        {
+            "questionId": "Q1",
+            "question": "What is 18 + 7?",
+            "competency": "numeracy",
+            "answer": "25"
+        },
+        {
+            "questionId": "Q2",
+            "question": "Which one is different: mango, banana, carrot, apple? Explain briefly.",
+            "competency": "reasoning",
+            "answer": "Carrot is different because others are fruits."
+        }
+    ]
+}
+```
+
+All admissions endpoints support `MOCK_LLM=true` for deterministic offline outputs during integration.
 
 ## Useful commands (from workspace root)
 
