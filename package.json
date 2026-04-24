@@ -1,0 +1,16 @@
+{
+  "name": "campus-cortex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "typecheck": "bun run --filter='*' typecheck",
+    "dev:backend": "bun run --filter=@campus/backend dev",
+    "dev:agent": "bun run --filter=@campus/agent dev",
+    "db:apply": "bun run --filter=@campus/agent db:apply",
+    "db:seed": "bun run --filter=@campus/agent db:seed",
+    "db:generate": "bun run --filter=@campus/agent db:generate",
+    "db:studio": "bun run --filter=@campus/agent db:studio"
+  }
+}

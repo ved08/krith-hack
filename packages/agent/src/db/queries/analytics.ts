@@ -74,6 +74,7 @@ export type AttendanceToday = {
   classroomName: string | null;
 };
 
+
 export async function getAttendanceToday(
   studentId: number,
 ): Promise<Result<AttendanceToday>> {

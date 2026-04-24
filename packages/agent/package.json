@@ -1,0 +1,33 @@
+{
+  "name": "@campus/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./db": "./src/db/queries/index.ts",
+    "./schema": "./src/db/schema.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "db:generate": "bun --env-file=../../.env x drizzle-kit generate",
+    "db:apply": "bun --env-file=../../.env run src/db/apply-migrations.ts",
+    "db:seed": "bun --env-file=../../.env run src/db/seed.ts",
+    "db:studio": "bun --env-file=../../.env x drizzle-kit studio"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.1.41",
+    "@langchain/google-genai": "^2.1.28",
+    "@langchain/langgraph": "^1.2.9",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^5.6.3"
+  }
+}
