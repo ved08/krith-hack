@@ -7,6 +7,8 @@
   "scripts": {
     "typecheck": "bun run --filter='*' typecheck",
     "dev:backend": "bun run --filter=@campus/backend dev",
+    "dev:frontend": "bun run --filter=@campus/frontend dev",
+    "build:frontend": "bun run --filter=@campus/frontend build",
     "dev:agent": "bun run --filter=@campus/agent dev",
     "db:apply": "bun run --filter=@campus/agent db:apply",
     "db:seed": "bun run --filter=@campus/agent db:seed",

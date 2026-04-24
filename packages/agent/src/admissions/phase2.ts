@@ -1,7 +1,16 @@
+import { randomUUID } from "node:crypto";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { z } from "zod";
 import { env } from "../config/env.js";
+import {
+  insertAdmissionsEvaluation,
+  insertAdmissionsQuestionSet,
+  updateEvaluationCertificateUrl,
+} from "../db/queries/admissions.js";
+import { sendWhatsAppMessage } from "../notifications/whatsapp.js";
+import { uploadCertificatePdf } from "../storage/supabase-storage.js";
+import { buildCertificatePdf } from "./certificate.js";
 
 const E164Schema = z
   .string()
@@ -53,19 +62,23 @@ const QuestionSetModelOutputSchema = z.object({
 const SkillBreakdownSchema = z.object({
   competency: CompetencySchema,
   score: z.number().min(0).max(100),
-  evidence: z.string().min(8).max(240),
+  evidence: z.string().min(4).max(280),
 });
 
+// Minimums here are deliberately permissive. With sparse candidate responses
+// (say 2–3 answers), the model honestly can only extract one clear strength
+// or growth area — forcing 2+ would push it to fabricate. Max values are kept
+// as soft upper bounds to keep the certificate UI readable.
 const LearningDnaSchema = z.object({
   overallScore: z.number().min(0).max(100),
   readinessBand: z.enum(["Foundational", "Developing", "Proficient", "Advanced"]),
-  summary: z.string().min(24).max(1000),
-  strengths: z.array(z.string().min(3).max(120)).min(2).max(6),
-  growthAreas: z.array(z.string().min(3).max(120)).min(2).max(6),
-  recommendedActions: z.array(z.string().min(8).max(220)).min(3).max(8),
-  skillBreakdown: z.array(SkillBreakdownSchema).min(3).max(5),
+  summary: z.string().min(16).max(1200),
+  strengths: z.array(z.string().min(2).max(160)).min(1).max(8),
+  growthAreas: z.array(z.string().min(2).max(160)).min(1).max(8),
+  recommendedActions: z.array(z.string().min(4).max(240)).min(1).max(10),
+  skillBreakdown: z.array(SkillBreakdownSchema).min(1).max(6),
   confidence: z.number().min(0).max(100),
-  certificateHeadline: z.string().min(6).max(120),
+  certificateHeadline: z.string().min(4).max(140),
 });
 
 const GEMINI_MODEL = "gemini-2.5-flash";
@@ -86,16 +99,36 @@ export type AdmissionsQuestionSet = {
 };
 
 export type AdmissionsEvaluation = {
+  evaluationId: string;
   evaluatedAtIso: string;
   model: string;
   profile: AdmissionProfile;
   responseCount: number;
   analysis: LearningDnaAnalysis;
+  /** Public URL of the Learning DNA certificate PDF (null if generation
+   *  / upload failed, or no persistence context was supplied). */
+  certificateUrl: string | null;
+  /** Outcome of the outbound WhatsApp send to the parent. Always present —
+   *  "skipped" means we didn't attempt (no cert URL / no phone). */
+  whatsappDelivery: "sent" | "dry_run" | "skipped" | "error";
+  whatsappError?: string;
+};
+
+/**
+ * Optional persistence context. When passed, the module writes the question
+ * set / evaluation to the admissions_* tables. When absent (anonymous preview
+ * flows), the data is returned in memory only — no DB write happens.
+ */
+export type AdmissionsPersistContext = {
+  schoolId?: number | null;
+  studentId?: number | null;
+  questionSetId?: string | null; // for evaluations: link back to the set
 };
 
 export async function generateAdmissionsQuestions(input: {
   profile: AdmissionProfile;
   questionCount?: number;
+  persist?: AdmissionsPersistContext;
 }): Promise<AdmissionsQuestionSet> {
   const profile = AdmissionProfileSchema.parse(input.profile);
   const questionCount = clamp(input.questionCount ?? 8, 5, 12);
@@ -110,20 +143,47 @@ export async function generateAdmissionsQuestions(input: {
     profile,
   );
 
-  return {
-    questionSetId: buildQuestionSetId(profile.parentPhoneE164),
+  const questionSetId = randomUUID();
+  const model = env.MOCK_LLM ? "mock-admissions-v1" : GEMINI_MODEL;
+  const set: AdmissionsQuestionSet = {
+    questionSetId,
     generatedAtIso: new Date().toISOString(),
-    model: env.MOCK_LLM ? "mock-admissions-v1" : GEMINI_MODEL,
+    model,
     profile,
     gradeBand: modelOutput.gradeBand,
     rationale: modelOutput.rationale,
     questions: normalizedQuestions,
   };
+
+  // Best-effort persistence. A DB failure should not block returning the
+  // generated set to the kiosk — the set is already complete and usable.
+  if (input.persist) {
+    const result = await insertAdmissionsQuestionSet({
+      id: questionSetId,
+      schoolId: input.persist.schoolId ?? null,
+      studentId: input.persist.studentId ?? null,
+      parentPhoneE164: profile.parentPhoneE164,
+      studentName: profile.studentName,
+      profile,
+      gradeBand: modelOutput.gradeBand,
+      rationale: modelOutput.rationale,
+      questions: normalizedQuestions,
+      model,
+    });
+    if (!result.success) {
+      console.error(
+        `[admissions] failed to persist question set ${questionSetId}: ${result.error.code}: ${result.error.message}`,
+      );
+    }
+  }
+
+  return set;
 }
 
 export async function analyzeAdmissionsResponses(input: {
   profile: AdmissionProfile;
   responses: CandidateResponse[];
+  persist?: AdmissionsPersistContext;
 }): Promise<AdmissionsEvaluation> {
   const profile = AdmissionProfileSchema.parse(input.profile);
   const responses = z.array(CandidateResponseSchema).min(1).max(20).parse(input.responses);
@@ -132,13 +192,141 @@ export async function analyzeAdmissionsResponses(input: {
     ? buildMockLearningDna(profile, responses)
     : await analyzeWithGemini(profile, responses);
 
+  const evaluationId = randomUUID();
+  const model = env.MOCK_LLM ? "mock-admissions-v1" : GEMINI_MODEL;
+
+  let evaluationPersisted = false;
+  if (input.persist) {
+    const result = await insertAdmissionsEvaluation({
+      id: evaluationId,
+      schoolId: input.persist.schoolId ?? null,
+      studentId: input.persist.studentId ?? null,
+      questionSetId: input.persist.questionSetId ?? null,
+      parentPhoneE164: profile.parentPhoneE164,
+      studentName: profile.studentName,
+      profile,
+      responses,
+      analysis,
+      overallScore: analysis.overallScore,
+      readinessBand: analysis.readinessBand,
+      model,
+    });
+    if (!result.success) {
+      console.error(
+        `[admissions] failed to persist evaluation ${evaluationId}: ${result.error.code}: ${result.error.message}`,
+      );
+    } else {
+      evaluationPersisted = true;
+    }
+  }
+
+  const evaluatedAtIso = new Date().toISOString();
+
+  // Post-analysis side-effects: build the certificate PDF, upload to
+  // Supabase Storage, and notify the parent on WhatsApp. Each step is
+  // best-effort — a failure logs and continues. The analysis response
+  // always returns, with certificateUrl/whatsappDelivery flags telling
+  // the caller what succeeded.
+  let certificateUrl: string | null = null;
+  let whatsappDelivery: AdmissionsEvaluation["whatsappDelivery"] = "skipped";
+  let whatsappError: string | undefined;
+
+  try {
+    const pdf = await buildCertificatePdf({
+      studentName: profile.studentName,
+      parentName: profile.parentName,
+      schoolName: profile.schoolName,
+      currentClass: profile.currentClass,
+      overallScore: analysis.overallScore,
+      readinessBand: analysis.readinessBand,
+      summary: analysis.summary,
+      strengths: analysis.strengths,
+      growthAreas: analysis.growthAreas,
+      recommendedActions: analysis.recommendedActions,
+      certificateHeadline: analysis.certificateHeadline,
+      evaluationId,
+      evaluatedAtIso,
+    });
+
+    const upload = await uploadCertificatePdf(
+      `evaluation-${evaluationId}.pdf`,
+      pdf,
+    );
+    if (upload.kind === "UPLOADED") {
+      certificateUrl = upload.url;
+      if (evaluationPersisted) {
+        const updateRes = await updateEvaluationCertificateUrl(
+          evaluationId,
+          upload.url,
+        );
+        if (!updateRes.success) {
+          console.error(
+            `[admissions] failed to attach certificate URL to evaluation ${evaluationId}: ${updateRes.error.message}`,
+          );
+        }
+      }
+    } else if (upload.kind === "ERROR") {
+      console.error(
+        `[admissions] certificate upload failed for ${evaluationId}: ${upload.message}`,
+      );
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error(
+      `[admissions] certificate generation failed for ${evaluationId}: ${message}`,
+    );
+  }
+
+  // WhatsApp the parent only when we have both a URL to send AND the
+  // parent's phone. Skip when the certificate wasn't uploaded, since
+  // sending "your certificate is at null" is worse than silence.
+  if (certificateUrl && profile.parentPhoneE164) {
+    const body = buildParentWhatsAppMessage({
+      studentName: profile.studentName,
+      headline: analysis.certificateHeadline,
+      overallScore: analysis.overallScore,
+      readinessBand: analysis.readinessBand,
+      certificateUrl,
+    });
+    const send = await sendWhatsAppMessage(profile.parentPhoneE164, body);
+    if (send.kind === "SENT") whatsappDelivery = "sent";
+    else if (send.kind === "DRY_RUN") whatsappDelivery = "dry_run";
+    else {
+      whatsappDelivery = "error";
+      whatsappError = send.message;
+    }
+  }
+
   return {
-    evaluatedAtIso: new Date().toISOString(),
-    model: env.MOCK_LLM ? "mock-admissions-v1" : GEMINI_MODEL,
+    evaluationId,
+    evaluatedAtIso,
+    model,
     profile,
     responseCount: responses.length,
     analysis,
+    certificateUrl,
+    whatsappDelivery,
+    ...(whatsappError ? { whatsappError } : {}),
   };
+}
+
+function buildParentWhatsAppMessage(opts: {
+  studentName: string;
+  headline: string;
+  overallScore: number;
+  readinessBand: string;
+  certificateUrl: string;
+}): string {
+  return [
+    `Hi! ${opts.studentName}'s Campus Cortex Learning DNA assessment is ready.`,
+    "",
+    `Overall score: ${opts.overallScore}/100`,
+    `Readiness: ${opts.readinessBand}`,
+    "",
+    opts.headline,
+    "",
+    `Certificate + detailed report (PDF): ${opts.certificateUrl}`,
+  ].join("\n");
 }
 
 async function buildQuestionSetWithGemini(
@@ -179,6 +367,10 @@ async function analyzeWithGemini(
       "Return strict JSON only. Never include markdown or code fences.",
       "Scores should be realistic and evidence-based.",
       "Do not provide medical or mental-health diagnoses.",
+      // Guard against empty-array rejections when responses are sparse —
+      // the schema allows single-item lists and the model should always
+      // produce at least one concrete item per list instead of leaving any empty.
+      "Every list MUST contain at least one concrete item, even if evidence is thin — derive a best-effort observation rather than returning an empty array.",
     ].join(" "),
     [
       `Student profile JSON: ${JSON.stringify(profile)}`,
@@ -203,7 +395,14 @@ async function invokeGeminiJson<T>(
     apiKey: env.GEMINI_API_KEY,
     model: GEMINI_MODEL,
     temperature: 0.2,
-    maxOutputTokens: 1800,
+    // Bumped from 1800 — the Learning DNA schema (summary + 8 actions + 5
+    // skill-breakdown items with evidence each) routinely approaches the old
+    // ceiling and got truncated mid-JSON.
+    maxOutputTokens: 4096,
+    // Forces `generationConfig.responseMimeType = "application/json"` under
+    // the hood, which suppresses Gemini's natural-language preamble and any
+    // <think> scratch-pad it might emit. Essential for 2.5-flash.
+    json: true,
   });
 
   const response = await llm.invoke([
@@ -212,10 +411,25 @@ async function invokeGeminiJson<T>(
   ]);
 
   const text = extractTextContent(response.content);
-  const parsedJson = parseJsonObject(text);
+  let parsedJson: unknown;
+  try {
+    parsedJson = parseJsonObject(text);
+  } catch (e) {
+    // Dump the raw output so the next run has something actionable to
+    // look at rather than a bare "did not return valid JSON".
+    console.error(
+      "[admissions] Gemini returned non-JSON. Raw output follows:\n---\n%s\n---",
+      text,
+    );
+    throw e;
+  }
   const parsed = schema.safeParse(parsedJson);
 
   if (!parsed.success) {
+    console.error(
+      "[admissions] Gemini JSON failed schema validation. Raw JSON:\n---\n%s\n---",
+      JSON.stringify(parsedJson, null, 2),
+    );
     throw new Error(`Gemini output validation failed: ${parsed.error.message}`);
   }
 
@@ -511,11 +725,6 @@ function labelCompetency(
     case "learning-readiness":
       return "Learning Readiness";
   }
-}
-
-function buildQuestionSetId(parentPhoneE164: string): string {
-  const suffix = parentPhoneE164.slice(-4);
-  return `qs_${Date.now()}_${suffix}`;
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -14,6 +14,12 @@ export type { AgentRunOutcome } from "./agent/graph.js";
 // under MOCK_LLM or when GEMINI_API_KEY is absent.
 export { formatForWhatsApp } from "./agent/formatter.js";
 
+// Outbound WhatsApp sender — shared across the webhook (quick reply) and
+// the admissions flow (certificate notification). Dry-run when TWILIO_*
+// env vars are missing.
+export { sendWhatsAppMessage } from "./notifications/whatsapp.js";
+export type { WhatsAppSendResult } from "./notifications/whatsapp.js";
+
 // Sender context — useful for logging / observability on the webhook side.
 export { loadAgentContext } from "./agent/context.js";
 export type { AgentContext, LoadContextOutcome } from "./agent/context.js";
@@ -44,6 +50,11 @@ export {
   resolveStudentFromName,
   canCallerAccessStudent,
   upsertAdmissionsIntake,
+  insertAdmissionsQuestionSet,
+  insertAdmissionsEvaluation,
+  updateEvaluationCertificateUrl,
+  getLatestAdmissionsEvaluation,
+  isPasswordSet,
 } from "./db/queries/index.js";
 
 // Shared result envelope.
@@ -51,6 +62,8 @@ export type { Result, ErrorCode } from "./db/queries/result.js";
 export type {
   UpsertAdmissionsIntakeInput,
   UpsertAdmissionsIntakeOutput,
+  InsertQuestionSetInput,
+  InsertEvaluationInput,
 } from "./db/queries/admissions.js";
 
 // Environment loader — exposed so the backend can read MOCK_LLM etc. via the
@@ -71,5 +84,6 @@ export type {
   CandidateResponse,
   AdmissionsQuestionSet,
   AdmissionsEvaluation,
+  AdmissionsPersistContext,
   LearningDnaAnalysis,
 } from "./admissions/phase2.js";

@@ -9,6 +9,7 @@ import {
   index,
   date,
   numeric,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -52,6 +53,11 @@ export const users = pgTable(
     role: userRoleEnum("role").notNull(),
     phoneNumber: text("phone_number").notNull(),
     fullName: text("full_name").notNull(),
+    // NULL = the user has no real password yet (kiosk-created). Whenever a
+    // login flow is added, mark this timestamp the moment the parent/student
+    // sets a credential. `isPasswordSet(user)` in queries/students.ts is the
+    // idiomatic check.
+    passwordSetAt: timestamp("password_set_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -225,6 +231,77 @@ export const assignmentSubmission = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// Admissions Phase 2 — persisted question sets + Learning DNA evaluations.
+//
+// Both tables use text-typed UUID primary keys (generated in app code via
+// crypto.randomUUID()). student_id / school_id are nullable so "anonymous
+// preview" flows can still persist history if desired — and so cascading
+// user deletions don't wipe audit trails.
+// ---------------------------------------------------------------------------
+
+export const admissionsQuestionSets = pgTable(
+  "admissions_question_sets",
+  {
+    id: text("id").primaryKey(), // UUID v4
+    schoolId: bigint("school_id", { mode: "number" }).references(() => schools.id, {
+      onDelete: "set null",
+    }),
+    studentId: bigint("student_id", { mode: "number" }).references(() => users.id, {
+      onDelete: "set null",
+    }),
+    parentPhoneE164: text("parent_phone_e164"),
+    studentName: text("student_name").notNull(),
+    profile: jsonb("profile").notNull(), // full AdmissionProfile snapshot
+    gradeBand: text("grade_band").notNull(),
+    rationale: text("rationale").notNull(),
+    questions: jsonb("questions").notNull(), // array of AdmissionQuestion
+    model: text("model").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    studentLookup: index("admissions_question_sets_student_idx").on(t.studentId),
+    phoneLookup: index("admissions_question_sets_parent_phone_idx").on(t.parentPhoneE164),
+    createdLookup: index("admissions_question_sets_created_idx").on(t.createdAt),
+  }),
+);
+
+export const admissionsEvaluations = pgTable(
+  "admissions_evaluations",
+  {
+    id: text("id").primaryKey(), // UUID v4
+    schoolId: bigint("school_id", { mode: "number" }).references(() => schools.id, {
+      onDelete: "set null",
+    }),
+    studentId: bigint("student_id", { mode: "number" }).references(() => users.id, {
+      onDelete: "set null",
+    }),
+    questionSetId: text("question_set_id").references(() => admissionsQuestionSets.id, {
+      onDelete: "set null",
+    }),
+    parentPhoneE164: text("parent_phone_e164"),
+    studentName: text("student_name").notNull(),
+    profile: jsonb("profile").notNull(),
+    responses: jsonb("responses").notNull(), // array of CandidateResponse
+    analysis: jsonb("analysis").notNull(), // full LearningDnaAnalysis
+    // Mirrored scalars for cheap dashboards / sort / filter without jsonb digs.
+    overallScore: numeric("overall_score", { precision: 5, scale: 2 }).notNull(),
+    readinessBand: text("readiness_band").notNull(),
+    model: text("model").notNull(),
+    // Public URL of the generated Learning DNA certificate PDF. Populated
+    // post-evaluation when PDF generation + upload succeeds; stays NULL on
+    // failure (evaluation is still valid, just without a certificate link).
+    certificateUrl: text("certificate_url"),
+    evaluatedAt: timestamp("evaluated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    studentLookup: index("admissions_evaluations_student_idx").on(t.studentId),
+    phoneLookup: index("admissions_evaluations_parent_phone_idx").on(t.parentPhoneE164),
+    evaluatedLookup: index("admissions_evaluations_evaluated_idx").on(t.evaluatedAt),
+    questionSetLookup: index("admissions_evaluations_question_set_idx").on(t.questionSetId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // Relations
 // ---------------------------------------------------------------------------
 
@@ -331,3 +408,11 @@ export type Assignment = typeof assignments.$inferSelect;
 export type NewAssignment = typeof assignments.$inferInsert;
 export type AssignmentSubmission = typeof assignmentSubmission.$inferSelect;
 export type NewAssignmentSubmission = typeof assignmentSubmission.$inferInsert;
+
+// Renamed to *Row to avoid colliding with the richer domain types exported
+// from packages/agent/src/admissions/phase2.ts (AdmissionsQuestionSet,
+// AdmissionsEvaluation).
+export type AdmissionsQuestionSetRow = typeof admissionsQuestionSets.$inferSelect;
+export type NewAdmissionsQuestionSetRow = typeof admissionsQuestionSets.$inferInsert;
+export type AdmissionsEvaluationRow = typeof admissionsEvaluations.$inferSelect;
+export type NewAdmissionsEvaluationRow = typeof admissionsEvaluations.$inferInsert;
