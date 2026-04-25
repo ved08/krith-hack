@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Banner } from "../components/Banner.js";
 import { Button } from "../components/Button.js";
 import { Card, CardHeader } from "../components/Card.js";
-import { FieldWrapper, Input } from "../components/Field.js";
+import { FieldWrapper, Input, Select, Textarea } from "../components/Field.js";
 import { Pill } from "../components/Pill.js";
 import {
   fetchQuizForStudent,

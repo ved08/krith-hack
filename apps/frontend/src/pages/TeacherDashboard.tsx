@@ -467,7 +467,10 @@ function StudentsCard({
       {notifyTarget ? (
         <NotifyStudentModal
           token={token}
-          student={notifyTarget}
+          studentId={notifyTarget.studentId}
+          studentName={notifyTarget.fullName}
+          classroomId={notifyTarget.classroomId}
+          classroomLabel={`${notifyTarget.subject} · ${notifyTarget.classroomName}`}
           onClose={() => setNotifyTarget(null)}
           onSent={() => {
             setNotifyTarget(null);
@@ -478,7 +481,8 @@ function StudentsCard({
 
       {chartsTarget ? (
         <StudentDetailModal
-          student={chartsTarget}
+          token={token}
+          studentId={chartsTarget.studentId}
           onClose={() => setChartsTarget(null)}
         />
       ) : null}
@@ -573,7 +577,7 @@ function ClassroomSetupWizard({
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {rows.map((r, i) => (
               <div key={r.id} className="grid grid-cols-[1fr,1fr,auto] gap-3">
-                <FieldWrapper label={i === 0 ? "Grade" : undefined}>
+                <FieldWrapper label={i === 0 ? "Grade" : ""}>
                   <Input
                     value={r.grade}
                     onChange={(e) => update(r.id, { grade: e.target.value })}
@@ -582,7 +586,7 @@ function ClassroomSetupWizard({
                     className="rounded-lg border-2 border-slate-200 focus:border-primary-400"
                   />
                 </FieldWrapper>
-                <FieldWrapper label={i === 0 ? "Subject" : undefined}>
+                <FieldWrapper label={i === 0 ? "Subject" : ""}>
                   <Input
                     value={r.subject}
                     onChange={(e) => update(r.id, { subject: e.target.value })}

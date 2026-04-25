@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button.js";
 import { Navigation } from "../components/Navigation.js";
@@ -21,6 +20,22 @@ const cardData = [
       "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=900&q=80",
   },
 ];
+
+// Stat tiles shown on the hero. These are showcase figures — wire them up
+// to a real /stats endpoint when one exists. Keeping `statsData` and the
+// `counts` fallback here at module scope so the page never crashes when
+// the backend is unavailable.
+const statsData = [
+  { label: "Active students" },
+  { label: "Quizzes created" },
+  { label: "Schools" },
+] as const;
+
+const counts = {
+  students: 1200,
+  quizzes: 480,
+  schools: 12,
+} as const;
 
 export function HomePage() {
   const navigate = useNavigate();
