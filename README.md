@@ -1,154 +1,208 @@
 # Campus Cortex
 
-WhatsApp-first school communication hub. Parents and students ask academic
-questions via WhatsApp; an AI agent answers using structured queries over a
-Postgres school database.
+**WhatsApp meets agentic AI for schools.** Parents text questions in plain English and get answers. Teachers upload attendance and marks; parents and students get a WhatsApp message seconds later. No portals, no app downloads, no logins.
 
-## Layout
+> _"How is Arjun doing in Math?"_ — typed into WhatsApp, answered by an LLM agent that queries the school database, scopes results by school + role, and replies in conversational English.
 
-Bun workspace.
+---
+
+## Why this exists
+
+Schools push information across SMS, email, three different portals, and a parent app no one logs into. Parents end up chasing data instead of receiving it. Campus Cortex collapses every channel into the one app every parent already uses — **WhatsApp** — and puts an agent in front of the school's database so the conversation feels natural.
+
+## What WhatsApp actually does here
+
+WhatsApp is **not just a notification pipe**. It is the primary read+write surface for parents and students:
+
+| Direction | What happens | Trigger |
+|---|---|---|
+| **Inbound (reactive)** | Parent texts a question. Twilio webhook → Hono `/webhook` → LangGraph agent. Agent classifies intent, resolves child names → DB ids, calls structured query tools (`getAttendance`, `getGrades`, `getStudentSummary`, …), composes a natural reply, returns TwiML. Twilio auto-sends it back. | User-initiated message |
+| **Outbound · attendance** | Teacher saves attendance from the dashboard → backend writes `attendance` rows → fans out a WhatsApp message to the linked parent + student for each row. | Teacher action |
+| **Outbound · marks** | Teacher uploads grades / publishes a quiz → backend computes percentages → WhatsApps every affected parent and student with the score. | Teacher action |
+| **Outbound · admissions** | Kiosk submission completes → Gemini generates a Learning DNA certificate PDF → uploaded to Supabase Storage → URL sent to the parent's WhatsApp. | Kiosk completion |
+| **Outbound · scheduled** | 8 AM attendance check, 6 PM daily summary, weekly grade report. Cron-driven. | Time |
+
+Every outbound path uses the same `notifications/whatsapp` module so phone-number normalization, dry-run mode, retry, and delivery accounting (`sent / dry_run / skipped / failed`) live in one place.
+
+### Inbound flow
+
+```
+Parent's phone
+   │  "how is Arjun in math?"
+   ▼
+Twilio WhatsApp Sandbox
+   │  POST x-www-form-urlencoded {From, Body, …}
+   ▼
+Hono /webhook  ──→  signature check (TWILIO_AUTH_TOKEN, optional)
+   │
+   ▼
+Resolve sender by E.164 in `users.phone_number`
+   │      └─ unknown → canned reply, return TwiML
+   ▼
+LangGraph agent (Gemini)
+   ├─ intent classification     (academic / result / support)
+   ├─ entity extraction          ("Arjun", "math")
+   ├─ child resolution           parent_student_link → student_id
+   ├─ tool call                  getStudentSummary({studentId, subject:"math"})
+   └─ response synthesis         → friendly Indian-English reply
+   │
+   ▼
+TwiML  <Response><Message>Hi! Arjun's last math quiz was 18/20…</Message></Response>
+   │
+   ▼
+Twilio sends the reply on WhatsApp.
+```
+
+### Outbound delivery contract
+
+Every action that writes to the DB and notifies users returns a delivery summary:
+
+```jsonc
+{
+  "written": 24,           // rows persisted
+  "whatsappSent": 22,      // delivered via Twilio
+  "whatsappFailed": 1,     // Twilio returned an error
+  "whatsappSkipped": 1,    // user has no phone or DRY_RUN=true
+}
+```
+
+Set `MOCK_WHATSAPP=true` in `.env` to log messages locally without burning Twilio quota — useful for `bun run dev:backend` against a real database.
+
+---
+
+## Architecture
 
 ```
 campus-cortex/
-├── .env                  # shared env: DATABASE_URL, GEMINI_API_KEY, MOCK_LLM
-├── package.json          # workspace root (runs filtered scripts)
 ├── packages/
-│   └── agent/            # @campus/agent — LangChain agent, DB queries, tools
-│       ├── src/
-│       │   ├── agent/    # LangGraph + Gemini + tools + prompts
-│       │   ├── db/       # Drizzle schema, queries, analytics, seed
-│       │   └── config/
-│       └── drizzle/      # generated SQL migrations
-└── apps/
-    └── backend/          # @campus/backend — WhatsApp-facing Hono service
-        └── src/
-            ├── routes/
-            │   ├── webhook.ts  # Twilio WhatsApp inbound (form-encoded → TwiML)
-            │   └── agent.ts    # JSON /agent/message for dashboards / curl
-            ├── env.ts          # PORT, TWILIO_AUTH_TOKEN
-            └── index.ts        # Hono bootstrap
+│   └── agent/                       # @campus/agent — all domain logic
+│       └── src/
+│           ├── agent/               # LangGraph workflow + Gemini prompts
+│           ├── chat/                # WhatsApp dialogue + canned replies
+│           ├── notifications/       # Twilio client, templates, dry-run
+│           ├── classroom/           # attendance + grades + quiz scoring
+│           ├── admissions/          # kiosk intake → Learning DNA → PDF
+│           ├── reports/             # PDF generation (puppeteer)
+│           ├── storage/             # Supabase Storage uploads
+│           ├── db/                  # Drizzle schema + queries + analytics
+│           └── llm/                 # Gemini wrapper, MOCK_LLM mode
+│
+├── apps/
+│   ├── backend/                     # @campus/backend — Hono HTTP service
+│   │   └── src/routes/
+│   │       ├── webhook.ts           # Twilio inbound (form → TwiML)
+│   │       ├── agent.ts             # JSON /agent/message
+│   │       ├── teacher.ts           # classroom CRUD
+│   │       ├── teacher-uploads.ts   # attendance + marks → fanout WhatsApp
+│   │       ├── quizzes.ts           # AI quiz publish + student submit
+│   │       ├── admissions.ts        # kiosk intake / questions / analyze
+│   │       ├── analytics.ts         # teacher + student dashboards
+│   │       ├── auth.ts              # teacher JWT login + signup
+│   │       └── lookups.ts           # schools, grades
+│   │
+│   └── frontend/                    # React + Vite + Tailwind
+│       └── src/
+│           ├── pages/               # Home, Kiosk, Student, Chat, Teacher…
+│           └── components/          # Card, Button, Pill, Charts, Banner…
+│
+└── docker-compose.yml               # local Redis (rate limit + queue)
 ```
 
-The `@campus/agent` package is importable from anywhere in the workspace:
+`@campus/agent` is workspace-shared, importable from anywhere:
 
 ```ts
 import { runAgent } from "@campus/agent";
+import { sendWhatsApp } from "@campus/agent/notifications";
 import { insertAttendanceBatch } from "@campus/agent/db";
 ```
 
+---
+
 ## Setup
 
-1. Copy env: `cp .env.example .env`, fill `DATABASE_URL` + `GEMINI_API_KEY`.
-2. Install: `bun install` (from workspace root).
-3. Apply schema: `bun run db:apply`.
-4. Seed data: `bun run db:seed`.
-5. Run backend: `bun run dev:backend` → listens on `:3000`.
+```bash
+# 1. clone, copy env
+cp .env.example .env
+# fill DATABASE_URL, GEMINI_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
+# TWILIO_WHATSAPP_FROM, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+
+# 2. install workspace
+bun install
+
+# 3. apply schema + seed
+bun run db:apply
+bun run db:seed
+
+# 4. run services
+bun run dev:backend     # :3000  Hono + agent + webhook
+bun run dev:frontend    # :5173  React dashboard + kiosk
+docker compose up -d    # Redis (queue + dedupe)
+```
+
+### Connecting to Twilio WhatsApp
+
+1. Grab a **WhatsApp sandbox** number from the Twilio console.
+2. Expose `:3000` with ngrok: `ngrok http 3000`.
+3. In Twilio sandbox settings, set _"When a message comes in"_ → `POST https://<ngrok>/webhook`.
+4. Join the sandbox by sending the code (e.g. `join able-tiger`) from your phone.
+5. Text `"how is my child doing?"` from a seeded number — agent replies on WhatsApp.
+
+For production, swap the sandbox for a Twilio business sender or hook the same `notifications/whatsapp` module to Meta Cloud API / Evolution API — the contract is one method, `sendText({toE164, body})`.
+
+---
 
 ## Endpoints
 
-| Path | Method | Input | Response | Caller |
-|---|---|---|---|---|
-| `/health` | GET | — | JSON | anyone |
-| `/webhook` | POST | `application/x-www-form-urlencoded` (Twilio: `From`, `Body`, …) | TwiML (`text/xml`) | Twilio WhatsApp |
-| `/agent/message` | POST | `{fromPhoneE164, messageText}` JSON | `{success, data:{reply, canned}}` | dashboard, curl |
-| `/admissions/phase2/intake` | POST | `{schoolId, classroomId, profile, parentUsername?, studentUsername?, generateQuestions?, questionCount?}` JSON | `{success, data:{intake, questionSet?}}` | admissions kiosk frontend |
-| `/admissions/phase2/questions` | POST | `{profile, questionCount?}` JSON | `{success, data:{questionSetId, generatedAtIso, model, profile, gradeBand, rationale, questions[]}}` | admissions kiosk frontend |
-| `/admissions/phase2/analyze` | POST | `{profile, responses[]}` JSON | `{success, data:{evaluatedAtIso, model, profile, responseCount, analysis}}` | admissions kiosk frontend |
+| Method | Path | Purpose | Caller |
+|---|---|---|---|
+| `GET` | `/health` | Liveness | anyone |
+| `POST` | `/webhook` | **Twilio WhatsApp inbound.** Form-encoded. Returns TwiML. | Twilio |
+| `POST` | `/agent/message` | JSON peer of `/webhook` for dashboards / curl | Frontend chat page |
+| `POST` | `/auth/teacher/login` | Teacher login — returns JWT | Dashboard |
+| `POST` | `/auth/teacher/signup` | Teacher signup | Dashboard |
+| `GET` | `/teacher/classrooms` | Classes for the logged-in teacher | Dashboard (JWT) |
+| `POST` | `/teacher/classrooms` | Bulk-create classrooms | Dashboard (JWT) |
+| `GET` | `/teacher/students` | Roster across classrooms | Dashboard (JWT) |
+| `POST` | `/teacher/uploads/attendance` | Save attendance + WhatsApp parents | Dashboard (JWT) |
+| `POST` | `/teacher/uploads/marks` | Save marks + WhatsApp parents | Dashboard (JWT) |
+| `POST` | `/teacher/students/:id/notify` | Per-student manual WhatsApp | Dashboard (JWT) |
+| `POST` | `/quizzes` | Publish AI-generated quiz | Dashboard (JWT) |
+| `POST` | `/student/:id/quizzes/:quizId/submit` | Submit quiz → score → WhatsApp | Student page |
+| `POST` | `/admissions/phase2/intake` | Kiosk intake + question generation | Kiosk |
+| `POST` | `/admissions/phase2/analyze` | Score answers + Learning DNA + PDF + WhatsApp | Kiosk |
+| `GET` | `/teacher/analytics` | Dashboard overview (JWT) | Dashboard |
+| `GET` | `/student/:id/analytics` | Per-student detail | Student page |
 
-`/webhook` returns TwiML so Twilio auto-sends the reply back to the user — no Twilio API credentials required on the reply path.
+---
 
-## Admissions kiosk payload examples
+## Database
 
-### 1) Save admissions intake and generate question set
-
-```json
-{
-    "schoolId": 1,
-    "classroomId": 1,
-    "profile": {
-        "studentName": "Aarav Kumar",
-        "parentName": "Neha Kumar",
-        "parentPhoneE164": "+919876543210",
-        "studentPhoneE164": "+919876543211",
-        "currentClass": "Class 6",
-        "schoolName": "Sunrise Public School",
-        "preferredLanguage": "English"
-    },
-    "generateQuestions": true,
-    "questionCount": 8
-}
-```
-
-This call writes to `users`, `parent_student_link`, and `classroom_membership` using idempotent upserts.
-
-### 2) Generate class-based questions only (no DB write)
-
-```json
-{
-    "profile": {
-        "studentName": "Aarav Kumar",
-        "parentName": "Neha Kumar",
-        "parentPhoneE164": "+919876543210",
-        "studentPhoneE164": "+919876543211",
-        "currentClass": "Class 6",
-        "schoolName": "Sunrise Public School",
-        "preferredLanguage": "English"
-    },
-    "questionCount": 8
-}
-```
-
-### 3) Submit answers for Learning DNA analysis
-
-```json
-{
-    "profile": {
-        "studentName": "Aarav Kumar",
-        "parentName": "Neha Kumar",
-        "parentPhoneE164": "+919876543210",
-        "studentPhoneE164": "+919876543211",
-        "currentClass": "Class 6",
-        "schoolName": "Sunrise Public School",
-        "preferredLanguage": "English"
-    },
-    "responses": [
-        {
-            "questionId": "Q1",
-            "question": "What is 18 + 7?",
-            "competency": "numeracy",
-            "answer": "25"
-        },
-        {
-            "questionId": "Q2",
-            "question": "Which one is different: mango, banana, carrot, apple? Explain briefly.",
-            "competency": "reasoning",
-            "answer": "Carrot is different because others are fruits."
-        }
-    ]
-}
-```
-
-All admissions endpoints support `MOCK_LLM=true` for deterministic offline outputs during integration.
-
-## Useful commands (from workspace root)
+8 tables, plain Postgres, no ORM magic at the schema level (Drizzle is read/write only). Every query that returns parent/student data filters by `school_id` to enforce school isolation, plus the calling teacher's `teacher_id` to enforce ownership.
 
 ```
-bun run dev:backend          # start the HTTP service
-bun run db:generate          # schema.ts → SQL
-bun run db:apply             # apply SQL to Supabase
-bun run db:seed              # deterministic fixtures
-bun run typecheck            # typecheck all workspaces
+schools
+users                  (role: student | parent | teacher)
+parent_student_link
+classrooms
+classroom_membership
+class_session
+attendance             (status: PRESENT | LATE | ABSENT)
+assignments + assignment_submission
+classroom_quizzes + classroom_quiz_submissions
+admissions_question_sets + admissions_evaluations
 ```
 
-## Twilio WhatsApp sandbox wiring
+**Business rules:**
+- `attendance % = (PRESENT + LATE) / total_sessions × 100`
+- `grade % = AVG(assignment_submission.percentage)` per subject
+- Parent must verify with child's username + password to create a `parent_student_link`
+- Students cannot read parent views (RBAC enforced at query layer)
 
-1. In the Twilio console, grab a WhatsApp sandbox number.
-2. Expose local port via ngrok: `ngrok http 3000`.
-3. Set sandbox "When a message comes in" to `https://<ngrok>/webhook` (POST, HTTP).
-4. Join the sandbox by sending the join code from your phone.
-5. Ask "what is my sons attendance?" from a seeded phone to see the agent reply.
+---
 
-## Demo phone numbers (seeded)
+## Demo seeded numbers
+
+These map to rows in `users.phone_number`. Replace one with your real WhatsApp number to test live.
 
 | Phone | Who | Linked students |
 |---|---|---|
@@ -157,11 +211,51 @@ bun run typecheck            # typecheck all workspaces
 | `+914444444444` | Parent Iyer | Meera |
 | `+915555555555` | Student Arjun | self |
 
-These are fake numbers stored in `users.phone_number`. To test with your real WhatsApp number, update the corresponding user row in Supabase.
+Try (from any of those numbers):
 
-## Env flags
+```
+how is my child doing?
+what is the attendance?
+how is Arjun in math?
+any tests coming up this week?
+any pending homework?
+```
 
-- `MOCK_LLM=true` — skip Gemini, use deterministic keyword-routed fake LLM
-- `GEMINI_API_KEY=...` — required when `MOCK_LLM=false`
-- `TWILIO_AUTH_TOKEN=...` — optional, enables signature verification
-- `PORT=3000` — backend HTTP port
+---
+
+## Environment variables
+
+| Var | Required | Purpose |
+|---|---|---|
+| `DATABASE_URL` | yes | Postgres / Supabase pooler connection string |
+| `GEMINI_API_KEY` | unless `MOCK_LLM=true` | Google Generative AI key |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` | for live WhatsApp | Twilio credentials + sender |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | for PDF uploads | Storage bucket for certificates |
+| `MOCK_LLM` | no | `true` → deterministic stub agent replies |
+| `MOCK_WHATSAPP` | no | `true` → log messages instead of sending |
+| `PORT` | no | Backend HTTP port (default 3000) |
+
+---
+
+## Common workspace commands
+
+```bash
+bun run dev:backend          # start Hono + agent
+bun run dev:frontend         # start Vite frontend
+bun run db:generate          # drizzle: schema.ts → SQL migration
+bun run db:apply             # apply migrations to Supabase
+bun run db:seed              # load demo schools + parents + students
+bun run typecheck            # typecheck every workspace
+bun run build                # build backend + frontend
+```
+
+---
+
+## Team
+
+| Person | Owns |
+|---|---|
+| Murali Samant | Database schema + Python query tools |
+| Mani Shankar | WhatsApp / Twilio integration + templates |
+| Vedvardhan | Agentic backend (LangGraph + Gemini + scheduler) |
+| Shashipreetham | Dashboard + kiosk frontend |
