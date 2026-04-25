@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { env } from "./env.js";
+import { startAttendanceDailyCron } from "./jobs/attendance-cron.js";
 import { admissionsRouter } from "./routes/admissions.js";
 import { agentRouter } from "./routes/agent.js";
 import { webhookRouter } from "./routes/webhook.js";
@@ -35,6 +36,12 @@ app.route("/", agentRouter);
 app.route("/", admissionsRouter);
 
 serve({ fetch: app.fetch, port: env.PORT });
+
+startAttendanceDailyCron({
+  enabled: env.ATTENDANCE_CRON_ENABLED,
+  expression: env.ATTENDANCE_CRON_EXPRESSION,
+  timezone: env.ATTENDANCE_CRON_TIMEZONE,
+});
 
 console.log(
   `[campus-cortex-backend] listening on :${env.PORT} (MOCK_LLM=${agentEnv.MOCK_LLM})`,

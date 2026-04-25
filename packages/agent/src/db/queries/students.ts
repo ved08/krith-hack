@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../client.js";
 import { parentStudentLink, users } from "../schema.js";
 import { ok, type Result } from "./result.js";
@@ -147,4 +147,53 @@ export async function getStudentIdentitiesByIds(studentIds: number[]) {
     })
     .from(users)
     .where(and(inArray(users.id, studentIds), eq(users.role, "student")));
+}
+
+export type ParentAttendanceRecipient = {
+  studentId: number;
+  schoolId: number;
+  studentName: string;
+  parentId: number;
+  parentName: string;
+  parentPhoneE164: string;
+};
+
+/**
+ * Parent recipients for daily attendance broadcasts.
+ * Returns one row per (student, parent) link.
+ */
+export async function getParentAttendanceRecipients(): Promise<
+  ParentAttendanceRecipient[]
+> {
+  const rows = await db.execute(sql`
+    SELECT
+      s.id           AS student_id,
+      s.school_id    AS school_id,
+      s.full_name    AS student_name,
+      p.id           AS parent_id,
+      p.full_name    AS parent_name,
+      p.phone_number AS parent_phone_e164
+    FROM parent_student_link l
+    JOIN users s ON s.id = l.student_id
+    JOIN users p ON p.id = l.parent_id
+    WHERE s.role = 'student'
+      AND p.role = 'parent'
+    ORDER BY s.id, p.id
+  `);
+
+  return (rows as unknown as Array<{
+    student_id: number;
+    school_id: number;
+    student_name: string;
+    parent_id: number;
+    parent_name: string;
+    parent_phone_e164: string;
+  }>).map((r) => ({
+    studentId: r.student_id,
+    schoolId: r.school_id,
+    studentName: r.student_name,
+    parentId: r.parent_id,
+    parentName: r.parent_name,
+    parentPhoneE164: r.parent_phone_e164,
+  }));
 }
