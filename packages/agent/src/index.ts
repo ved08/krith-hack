@@ -17,8 +17,14 @@ export { formatForWhatsApp } from "./agent/formatter.js";
 // Outbound WhatsApp sender — shared across the webhook (quick reply) and
 // the admissions flow (certificate notification). Dry-run when TWILIO_*
 // env vars are missing.
-export { sendWhatsAppMessage } from "./notifications/whatsapp.js";
-export type { WhatsAppSendResult } from "./notifications/whatsapp.js";
+export {
+  sendWhatsAppMessage,
+  sendCertificateWhatsApp,
+} from "./notifications/whatsapp.js";
+export type {
+  WhatsAppSendResult,
+  CertificateNotificationPayload,
+} from "./notifications/whatsapp.js";
 
 // Sender context — useful for logging / observability on the webhook side.
 export { loadAgentContext } from "./agent/context.js";
@@ -55,7 +61,78 @@ export {
   updateEvaluationCertificateUrl,
   getLatestAdmissionsEvaluation,
   isPasswordSet,
+  // auth + lookups for the teacher dashboard + kiosk dropdowns
+  listSchools,
+  listClassroomsBySchool,
+  verifyTeacherCredentials,
+  loginOrCreateTeacher,
+  listStudentsForTeacher,
+  listClassroomsForTeacher,
+  createClassroomsForTeacher,
+  listStudentsInMyClassroom,
+  getNotificationTargetsForStudents,
+  listGradesForSchool,
+  hashPassword,
+  // classroom quizzes
+  insertClassroomQuiz,
+  listTeacherQuizzes,
+  listQuizzesForStudent,
+  getQuizForStudent,
+  getQuizFull,
+  insertQuizSubmission,
+  lookupStudentByUsername,
+  updateSubmissionReportUrl,
+  // dashboards
+  getTeacherOverview,
+  getStudentDetail,
+  getStudentDetailForTeacher,
 } from "./db/queries/index.js";
+
+export type {
+  TeacherOverview,
+  StudentDetail,
+  AttendanceTrendDay,
+  AttendanceTimelineEntry,
+  RecentQuizSubmission,
+  StudentQuizResult,
+  StudentAssignmentResult,
+  SubjectAverage,
+} from "./db/queries/dashboard.js";
+
+export {
+  generateClassroomQuiz,
+  scoreAndAnalyzeQuiz,
+} from "./classroom/quizzes.js";
+export { submitClassroomQuiz } from "./classroom/submit.js";
+export type { SubmitQuizInput, SubmitQuizOutput } from "./classroom/submit.js";
+export type {
+  QuizDifficulty,
+  QuizQuestion,
+  QuizMeta,
+  GeneratedQuiz,
+  QuizResponse,
+  QuizAnalysis,
+  GradedQuiz,
+} from "./classroom/quizzes.js";
+export type {
+  SchoolOption,
+  ClassroomOption,
+  GradeOption,
+} from "./db/queries/schools.js";
+export type {
+  AuthenticatedTeacher,
+  TeacherStudentRow,
+  TeacherClassroomRow,
+  CreateClassroomInput,
+  ClassroomRosterEntry,
+  NotificationTarget,
+} from "./db/queries/auth.js";
+export type {
+  ClassroomQuizRow,
+  TeacherQuizSummary,
+  StudentQuizEntry,
+  QuizForTaking,
+} from "./db/queries/quizzes.js";
 
 // Shared result envelope.
 export type { Result, ErrorCode } from "./db/queries/result.js";

@@ -1,14 +1,18 @@
-import { useMemo, useReducer } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import { Link } from "react-router-dom";
 import { Banner } from "../components/Banner.js";
 import { Button } from "../components/Button.js";
 import { Card, CardHeader } from "../components/Card.js";
-import { FieldWrapper, Input, Textarea } from "../components/Field.js";
+import { FieldWrapper, Input, Select, Textarea } from "../components/Field.js";
 import { Pill } from "../components/Pill.js";
 import {
   analyzeAdmissionsResponses,
   generateAdmissionsQuestions,
+  listGradesForSchool,
+  listSchools,
   submitAdmissionsIntake,
+  type GradeOption,
+  type SchoolOption,
 } from "../lib/api.js";
 import { isValidE164 } from "../lib/validation.js";
 import type {
@@ -29,7 +33,7 @@ type State = {
   step: Step;
   form: {
     schoolId: string;
-    classroomId: string;
+    grade: string;
     studentName: string;
     parentName: string;
     parentPhoneE164: string;
@@ -52,8 +56,8 @@ type State = {
 const INITIAL: State = {
   step: "intake",
   form: {
-    schoolId: "1",
-    classroomId: "1",
+    schoolId: "",
+    grade: "",
     studentName: "",
     parentName: "",
     parentPhoneE164: "+91",
@@ -229,6 +233,68 @@ function IntakeStep({
   dispatch: React.Dispatch<Action>;
 }) {
   const errors = useMemo(() => validateForm(state.form), [state.form]);
+
+  // Lookup data: schools load on mount; grades re-load whenever the
+  // selected school changes. A "grade" is a distinct value of
+  // `classrooms.name` in that school — picking it auto-enrolls the
+  // student in every subject classroom under that grade.
+  const [schools, setSchools] = useState<SchoolOption[] | null>(null);
+  const [schoolsError, setSchoolsError] = useState<string | null>(null);
+  const [grades, setGrades] = useState<GradeOption[] | null>(null);
+  const [gradesLoading, setGradesLoading] = useState(false);
+  const [gradesError, setGradesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listSchools().then((r) => {
+      if (cancelled) return;
+      if (!r.success) {
+        setSchoolsError(r.error.message);
+        return;
+      }
+      setSchools(r.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const id = Number.parseInt(state.form.schoolId, 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      setGrades(null);
+      return;
+    }
+    let cancelled = false;
+    setGradesLoading(true);
+    setGradesError(null);
+    listGradesForSchool(id).then((r) => {
+      if (cancelled) return;
+      setGradesLoading(false);
+      if (!r.success) {
+        setGradesError(r.error.message);
+        setGrades([]);
+        return;
+      }
+      setGrades(r.data);
+      // If the previously-picked grade isn't in this school's list,
+      // clear it so the user must pick again.
+      const stillValid = r.data.some((g) => g.grade === state.form.grade);
+      if (!stillValid) {
+        dispatch({ type: "UPDATE_FIELD", key: "grade", value: "" });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.form.schoolId]);
+
+  const selectedGrade = useMemo(
+    () => grades?.find((g) => g.grade === state.form.grade) ?? null,
+    [grades, state.form.grade],
+  );
+
   const canSubmit = Object.keys(errors).length === 0 && !state.submitting;
 
   async function onSubmit() {
@@ -256,21 +322,63 @@ function IntakeStep({
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <FieldWrapper label="School ID" hint="Must exist in schools table">
-          <Input
+        <FieldWrapper
+          label="School"
+          hint={schoolsError ? `Could not load schools: ${schoolsError}` : "Pick from existing schools"}
+          error={errors.schoolId}
+        >
+          <Select
             value={state.form.schoolId}
-            onChange={(e) => dispatch({ type: "UPDATE_FIELD", key: "schoolId", value: e.target.value })}
+            onChange={(e) =>
+              dispatch({ type: "UPDATE_FIELD", key: "schoolId", value: e.target.value })
+            }
             invalid={!!errors.schoolId}
-            inputMode="numeric"
-          />
+            disabled={!schools}
+          >
+            <option value="">{schools ? "Select a school…" : "Loading schools…"}</option>
+            {schools?.map((s) => (
+              <option key={s.id} value={String(s.id)}>
+                {s.name} (#{s.id})
+              </option>
+            ))}
+          </Select>
         </FieldWrapper>
-        <FieldWrapper label="Classroom ID" hint="Must belong to this school">
-          <Input
-            value={state.form.classroomId}
-            onChange={(e) => dispatch({ type: "UPDATE_FIELD", key: "classroomId", value: e.target.value })}
-            invalid={!!errors.classroomId}
-            inputMode="numeric"
-          />
+        <FieldWrapper
+          label="Grade"
+          hint={
+            gradesError
+              ? `Could not load grades: ${gradesError}`
+              : !state.form.schoolId
+              ? "Pick a school first"
+              : selectedGrade
+              ? `Will enroll in ${selectedGrade.classroomCount} classes (${selectedGrade.subjects.join(", ")})`
+              : "Pick the student's grade"
+          }
+          error={errors.grade}
+        >
+          <Select
+            value={state.form.grade}
+            onChange={(e) =>
+              dispatch({ type: "UPDATE_FIELD", key: "grade", value: e.target.value })
+            }
+            invalid={!!errors.grade}
+            disabled={!state.form.schoolId || gradesLoading || !grades}
+          >
+            <option value="">
+              {!state.form.schoolId
+                ? "Select a school first"
+                : gradesLoading
+                ? "Loading grades…"
+                : grades && grades.length === 0
+                ? "No grades configured for this school yet"
+                : "Select a grade…"}
+            </option>
+            {grades?.map((g) => (
+              <option key={g.grade} value={g.grade}>
+                {g.grade} — {g.classroomCount} class{g.classroomCount === 1 ? "" : "es"}
+              </option>
+            ))}
+          </Select>
         </FieldWrapper>
         <FieldWrapper label="Student name" error={errors.studentName}>
           <Input
@@ -375,13 +483,14 @@ function QuestionsStep({
     dispatch({ type: "REGEN_QUESTIONS_DONE", payload: res.data });
   }
 
-  async function analyze() {
+  async function analyze(overrideAnswers?: Record<string, string>) {
     if (!qs || !intake) return;
+    const answers = overrideAnswers ?? state.answers;
     const responses: CandidateResponse[] = qs.questions.map((q) => ({
       questionId: q.id,
       question: q.question,
       competency: q.competency,
-      answer: (state.answers[q.id] ?? "").trim(),
+      answer: (answers[q.id] ?? "").trim(),
     }));
     if (responses.some((r) => r.answer.length === 0)) {
       dispatch({
@@ -407,6 +516,34 @@ function QuestionsStep({
       return;
     }
     dispatch({ type: "ANALYZE_DONE", payload: res.data });
+  }
+
+  // Demo shortcut: fill every question with a plausible, non-empty
+  // response so the kiosk flow can be driven end-to-end (intake →
+  // analysis → PDF → WhatsApp) without 8 manual answers. Gemini still
+  // does the analysis against whatever we submit, so the resulting
+  // report is realistic-looking for the demo.
+  async function simulateAndSubmit() {
+    if (!qs || !intake) return;
+    const simulated: Record<string, string> = {};
+    for (const q of qs.questions) {
+      if (q.answerType === "number") {
+        simulated[q.id] = "5";
+      } else if (q.answerType === "mcq") {
+        // Admissions questions don't ship options; the student just
+        // writes the letter/label they believe is right. A plausible
+        // demo answer is an attempt phrased like a student.
+        simulated[q.id] = `I would pick the first option. ${q.rubricHint}`;
+      } else {
+        simulated[q.id] = `Sample answer demonstrating familiarity with ${q.competency}. ${q.rubricHint}`;
+      }
+    }
+    // Reflect the simulated answers in the UI so the teacher can see
+    // what was submitted before we flip to the analyzing step.
+    for (const [id, val] of Object.entries(simulated)) {
+      dispatch({ type: "UPDATE_ANSWER", questionId: id, value: val });
+    }
+    await analyze(simulated);
   }
 
   if (!intake) {
@@ -472,8 +609,17 @@ function QuestionsStep({
             />
           ))}
 
-          <div className="flex justify-end">
-            <Button onClick={analyze} loading={state.submitting}>
+          <div className="flex items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={simulateAndSubmit}
+              loading={state.submitting}
+              title="Auto-fill every question with a sample answer and submit — for demos"
+            >
+              🎲 Simulate test
+            </Button>
+            <Button onClick={() => analyze()} loading={state.submitting}>
               Submit for Learning DNA
             </Button>
           </div>
@@ -554,7 +700,7 @@ function IntakeSummary({
             INTAKE SAVED
           </div>
           <h3 className="mt-1 text-lg font-semibold text-slate-900">
-            {data.schoolName} · {data.classroomName}
+            {data.schoolName} · {data.grade}
           </h3>
           <p className="mt-1 text-sm text-slate-600">
             Parent user #{data.parentUserId}
@@ -568,8 +714,11 @@ function IntakeSummary({
           ) : (
             <Pill tone="slate">link existed</Pill>
           )}
-          {data.classroomEnrollmentCreated ? (
-            <Pill tone="emerald">enrolled</Pill>
+          {data.classroomEnrollmentsCreated > 0 ? (
+            <Pill tone="emerald">
+              enrolled in {data.classroomEnrollmentsCreated} class
+              {data.classroomEnrollmentsCreated === 1 ? "" : "es"}
+            </Pill>
           ) : (
             <Pill tone="slate">already enrolled</Pill>
           )}
@@ -871,8 +1020,7 @@ function validateForm(form: State["form"]): Partial<Record<keyof State["form"], 
   const errors: Partial<Record<keyof State["form"], string>> = {};
   if (!form.schoolId || Number.isNaN(Number(form.schoolId)) || Number(form.schoolId) <= 0)
     errors.schoolId = "positive integer required";
-  if (!form.classroomId || Number.isNaN(Number(form.classroomId)) || Number(form.classroomId) <= 0)
-    errors.classroomId = "positive integer required";
+  if (!form.grade.trim()) errors.grade = "pick a grade";
   if (!form.studentName.trim()) errors.studentName = "required";
   if (!form.parentName.trim()) errors.parentName = "required";
   if (!isValidE164(form.parentPhoneE164)) errors.parentPhoneE164 = "E.164 format, e.g. +919876543210";
@@ -900,7 +1048,7 @@ function buildIntakeBody(form: State["form"]) {
   const profile = buildProfile(form);
   return {
     schoolId: Number(form.schoolId),
-    classroomId: Number(form.classroomId),
+    grade: form.grade.trim(),
     profile: {
       ...profile,
       studentPhoneE164: form.studentPhoneE164.trim(),

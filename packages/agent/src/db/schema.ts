@@ -9,6 +9,7 @@ import {
   index,
   date,
   numeric,
+  integer,
   jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -29,6 +30,12 @@ export const assignmentTypeEnum = pgEnum("assignment_type", [
   "HOMEWORK",
   "QUIZ",
   "TEST",
+]);
+
+export const quizDifficultyEnum = pgEnum("quiz_difficulty", [
+  "easy",
+  "medium",
+  "hard",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -99,7 +106,14 @@ export const classrooms = pgTable(
     schoolId: bigint("school_id", { mode: "number" })
       .notNull()
       .references(() => schools.id, { onDelete: "restrict" }),
+    // `name` doubles as the grade label (e.g. "Grade 5A"). Students enrol
+    // by grade, which fans out across every classroom row sharing the
+    // same `name` within a school — one row per subject taught.
     name: text("name").notNull(),
+    // Subject taught in this classroom. Free text (no normalized lookup
+    // table) — we keep the schema flat to match the project's 8-table
+    // spec. Existing rows backfill to "General".
+    subject: text("subject").notNull().default("General"),
     teacherId: bigint("teacher_id", { mode: "number" })
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
@@ -298,6 +312,75 @@ export const admissionsEvaluations = pgTable(
     phoneLookup: index("admissions_evaluations_parent_phone_idx").on(t.parentPhoneE164),
     evaluatedLookup: index("admissions_evaluations_evaluated_idx").on(t.evaluatedAt),
     questionSetLookup: index("admissions_evaluations_question_set_idx").on(t.questionSetId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Teacher-created classroom quizzes (AI-generated via Gemini).
+//
+// Orthogonal to the `assignments` + `assignment_submission` grade tables:
+// quizzes are their own standalone thing because (a) the question payload
+// has rich shape that doesn't fit the flat grade-book, and (b) every
+// submission also stores a Gemini-written learning report + PDF link.
+// ---------------------------------------------------------------------------
+
+export const classroomQuizzes = pgTable(
+  "classroom_quizzes",
+  {
+    id: text("id").primaryKey(), // UUID v4
+    classroomId: bigint("classroom_id", { mode: "number" })
+      .notNull()
+      .references(() => classrooms.id, { onDelete: "cascade" }),
+    createdBy: bigint("created_by", { mode: "number" })
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    title: text("title").notNull(),
+    subject: text("subject").notNull(),
+    topic: text("topic").notNull(),
+    difficulty: quizDifficultyEnum("difficulty").notNull(),
+    questionCount: integer("question_count").notNull(),
+    timeLimitMinutes: integer("time_limit_minutes"), // NULL = untimed
+    instructions: text("instructions"),
+    // Array of { id, question, answerType, options?, correctAnswer?, points, rubricHint }
+    questions: jsonb("questions").notNull(),
+    maxScore: numeric("max_score", { precision: 8, scale: 2 }).notNull(),
+    dueDate: timestamp("due_date", { withTimezone: true }),
+    model: text("model").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    classroomLookup: index("classroom_quizzes_classroom_idx").on(t.classroomId),
+    createdLookup: index("classroom_quizzes_created_idx").on(t.createdAt),
+  }),
+);
+
+export const classroomQuizSubmissions = pgTable(
+  "classroom_quiz_submissions",
+  {
+    id: text("id").primaryKey(), // UUID v4
+    quizId: text("quiz_id")
+      .notNull()
+      .references(() => classroomQuizzes.id, { onDelete: "cascade" }),
+    studentId: bigint("student_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Array of { questionId, question, answer }
+    responses: jsonb("responses").notNull(),
+    // Structured Gemini analysis: summary, strengths, growthAreas, recommendedActions, skillBreakdown[]
+    analysis: jsonb("analysis").notNull(),
+    score: numeric("score", { precision: 8, scale: 2 }).notNull(),
+    maxScore: numeric("max_score", { precision: 8, scale: 2 }).notNull(),
+    percentage: numeric("percentage", { precision: 6, scale: 2 }).notNull(),
+    reportUrl: text("report_url"), // Supabase PDF URL (NULL if upload failed)
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    quizLookup: index("classroom_quiz_submissions_quiz_idx").on(t.quizId),
+    studentLookup: index("classroom_quiz_submissions_student_idx").on(t.studentId),
+    uniqueStudentQuiz: uniqueIndex("classroom_quiz_submissions_student_quiz_unique").on(
+      t.quizId,
+      t.studentId,
+    ),
   }),
 );
 

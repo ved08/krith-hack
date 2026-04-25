@@ -109,17 +109,23 @@ export type AdmissionsEvaluation = {
   whatsappError?: string;
 };
 
+export type IntakeEnrolledClassroom = {
+  classroomId: number;
+  subject: string;
+  teacherId: number;
+};
+
 export type UpsertAdmissionsIntakeOutput = {
   schoolId: number;
   schoolName: string;
-  classroomId: number;
-  classroomName: string;
+  grade: string;
+  enrollments: IntakeEnrolledClassroom[];
   parentUserId: number;
   studentUserId: number;
   parentCreated: boolean;
   studentCreated: boolean;
   parentStudentLinkCreated: boolean;
-  classroomEnrollmentCreated: boolean;
+  classroomEnrollmentsCreated: number;
   renamed: Array<{
     userId: number;
     role: "parent" | "student";

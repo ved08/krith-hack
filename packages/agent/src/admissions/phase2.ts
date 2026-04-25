@@ -8,7 +8,7 @@ import {
   insertAdmissionsQuestionSet,
   updateEvaluationCertificateUrl,
 } from "../db/queries/admissions.js";
-import { sendWhatsAppMessage } from "../notifications/whatsapp.js";
+import { sendCertificateWhatsApp } from "../notifications/whatsapp.js";
 import { uploadCertificatePdf } from "../storage/supabase-storage.js";
 import { buildCertificatePdf } from "./certificate.js";
 
@@ -248,9 +248,17 @@ export async function analyzeAdmissionsResponses(input: {
       evaluatedAtIso,
     });
 
+    // Group each student's certificates under their own folder in the
+    // bucket. Prefer the persisted studentId; when the intake didn't
+    // produce one, fall back to the parent's phone so uploads still
+    // land in a stable, per-family folder instead of the bucket root.
+    const folder = input.persist?.studentId
+      ? String(input.persist.studentId)
+      : profile.parentPhoneE164 ?? null;
     const upload = await uploadCertificatePdf(
       `evaluation-${evaluationId}.pdf`,
       pdf,
+      folder,
     );
     if (upload.kind === "UPLOADED") {
       certificateUrl = upload.url;
@@ -281,14 +289,20 @@ export async function analyzeAdmissionsResponses(input: {
   // parent's phone. Skip when the certificate wasn't uploaded, since
   // sending "your certificate is at null" is worse than silence.
   if (certificateUrl && profile.parentPhoneE164) {
-    const body = buildParentWhatsAppMessage({
+    const send = await sendCertificateWhatsApp({
+      parentPhoneE164: profile.parentPhoneE164,
+      parentName: profile.parentName,
       studentName: profile.studentName,
+      schoolName: profile.schoolName,
       headline: analysis.certificateHeadline,
       overallScore: analysis.overallScore,
       readinessBand: analysis.readinessBand,
+      summary: analysis.summary,
+      strengths: analysis.strengths,
+      growthAreas: analysis.growthAreas,
+      recommendedActions: analysis.recommendedActions,
       certificateUrl,
     });
-    const send = await sendWhatsAppMessage(profile.parentPhoneE164, body);
     if (send.kind === "SENT") whatsappDelivery = "sent";
     else if (send.kind === "DRY_RUN") whatsappDelivery = "dry_run";
     else {
@@ -308,25 +322,6 @@ export async function analyzeAdmissionsResponses(input: {
     whatsappDelivery,
     ...(whatsappError ? { whatsappError } : {}),
   };
-}
-
-function buildParentWhatsAppMessage(opts: {
-  studentName: string;
-  headline: string;
-  overallScore: number;
-  readinessBand: string;
-  certificateUrl: string;
-}): string {
-  return [
-    `Hi! ${opts.studentName}'s Campus Cortex Learning DNA assessment is ready.`,
-    "",
-    `Overall score: ${opts.overallScore}/100`,
-    `Readiness: ${opts.readinessBand}`,
-    "",
-    opts.headline,
-    "",
-    `Certificate + detailed report (PDF): ${opts.certificateUrl}`,
-  ].join("\n");
 }
 
 async function buildQuestionSetWithGemini(

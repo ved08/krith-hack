@@ -17,7 +17,13 @@ type WritableDb = Pick<typeof db, "select" | "insert" | "update">;
 
 export type UpsertAdmissionsIntakeInput = {
   schoolId: number;
-  classroomId: number;
+  /**
+   * Grade label the student is enrolling into (e.g. "Grade 5A"). The
+   * student is enrolled in every classroom row where
+   * `classrooms.name = grade` for this school — one per subject — so
+   * they're auto-connected to all subject teachers for that grade.
+   */
+  grade: string;
   parentName: string;
   parentPhoneE164: string;
   studentName: string;
@@ -27,17 +33,25 @@ export type UpsertAdmissionsIntakeInput = {
   verifiedAt?: Date;
 };
 
+export type IntakeEnrolledClassroom = {
+  classroomId: number;
+  subject: string;
+  teacherId: number;
+};
+
 export type UpsertAdmissionsIntakeOutput = {
   schoolId: number;
   schoolName: string;
-  classroomId: number;
-  classroomName: string;
+  grade: string;
+  /** All classrooms the student was enrolled into for this grade. */
+  enrollments: IntakeEnrolledClassroom[];
   parentUserId: number;
   studentUserId: number;
   parentCreated: boolean;
   studentCreated: boolean;
   parentStudentLinkCreated: boolean;
-  classroomEnrollmentCreated: boolean;
+  /** Number of NEW classroom_membership rows inserted (vs already-enrolled). */
+  classroomEnrollmentsCreated: number;
   /** Parent/student name renames detected (old → new); empty when none. */
   renamed: Array<{ userId: number; role: "parent" | "student"; from: string; to: string }>;
 };
@@ -84,16 +98,23 @@ export async function upsertAdmissionsIntake(
         .limit(1);
       if (!school) throw new RollbackAs("NOT_FOUND", `school ${input.schoolId} not found`);
 
-      const [classroom] = await tx
-        .select({ id: classrooms.id, name: classrooms.name, schoolId: classrooms.schoolId })
+      // Fan-out: every classroom in this school whose `name` matches the
+      // grade label. Each row is one (subject, teacher) pairing.
+      const matchingClassrooms = await tx
+        .select({
+          id: classrooms.id,
+          subject: classrooms.subject,
+          teacherId: classrooms.teacherId,
+        })
         .from(classrooms)
-        .where(eq(classrooms.id, input.classroomId))
-        .limit(1);
-      if (!classroom) {
-        throw new RollbackAs("NOT_FOUND", `classroom ${input.classroomId} not found`);
-      }
-      if (classroom.schoolId !== input.schoolId) {
-        throw new RollbackAs("UNAUTHORIZED", "classroom belongs to a different school");
+        .where(
+          and(eq(classrooms.schoolId, input.schoolId), eq(classrooms.name, input.grade)),
+        );
+      if (matchingClassrooms.length === 0) {
+        throw new RollbackAs(
+          "NOT_FOUND",
+          `no classrooms exist for grade "${input.grade}" in this school — ask the teacher dashboard to set them up first`,
+        );
       }
 
       const renamed: UpsertAdmissionsIntakeOutput["renamed"] = [];
@@ -129,28 +150,38 @@ export async function upsertAdmissionsIntake(
         })
         .returning({ id: parentStudentLink.id });
 
-      const enrollmentInsert = await tx
-        .insert(classroomMembership)
-        .values({
-          classroomId: input.classroomId,
-          studentId: student.id,
-        })
-        .onConflictDoNothing({
-          target: [classroomMembership.classroomId, classroomMembership.studentId],
-        })
-        .returning({ id: classroomMembership.id });
+      // Enroll the student in every classroom for this grade. One INSERT
+      // .. ON CONFLICT DO NOTHING per row — count how many rows were
+      // actually new so the caller can show "+3 classes added".
+      let createdCount = 0;
+      const enrollments: IntakeEnrolledClassroom[] = [];
+      for (const c of matchingClassrooms) {
+        const inserted = await tx
+          .insert(classroomMembership)
+          .values({ classroomId: c.id, studentId: student.id })
+          .onConflictDoNothing({
+            target: [classroomMembership.classroomId, classroomMembership.studentId],
+          })
+          .returning({ id: classroomMembership.id });
+        if (inserted.length > 0) createdCount += 1;
+        enrollments.push({
+          classroomId: c.id,
+          subject: c.subject,
+          teacherId: c.teacherId,
+        });
+      }
 
       return {
         schoolId: school.id,
         schoolName: school.name,
-        classroomId: classroom.id,
-        classroomName: classroom.name,
+        grade: input.grade,
+        enrollments,
         parentUserId: parent.id,
         studentUserId: student.id,
         parentCreated: parent.created,
         studentCreated: student.created,
         parentStudentLinkCreated: linkInsert.length > 0,
-        classroomEnrollmentCreated: enrollmentInsert.length > 0,
+        classroomEnrollmentsCreated: createdCount,
         renamed,
       } satisfies UpsertAdmissionsIntakeOutput;
     });

@@ -50,13 +50,22 @@ async function ensureBucket(client: SupabaseClient): Promise<void> {
 /**
  * Upload a PDF buffer and return its public URL.
  *
- * @param path object key inside the bucket (e.g. `evaluation-<id>.pdf`)
- * @param pdf  buffer of a generated PDF
+ * The final object key is `<folder>/<filename>` when `folder` is supplied,
+ * otherwise just `<filename>`. The folder is sanitized to keep the bucket
+ * layout predictable (alnum + `._-` only).
+ *
+ * @param filename object filename (e.g. `evaluation-<id>.pdf`)
+ * @param pdf      buffer of a generated PDF
+ * @param folder   optional subfolder — typically a user / student id
  */
 export async function uploadCertificatePdf(
-  path: string,
+  filename: string,
   pdf: Buffer | Uint8Array,
+  folder?: string | null,
 ): Promise<UploadResult> {
+  const safeFolder = folder ? folder.replace(/[^A-Za-z0-9._-]/g, "_") : "";
+  const path = safeFolder ? `${safeFolder}/${filename}` : filename;
+
   const client = getClient();
   if (!client) {
     console.log(`[storage] (dry-run) would upload ${path} (${pdf.byteLength} bytes)`);

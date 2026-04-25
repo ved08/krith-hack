@@ -7,6 +7,12 @@ import { env } from "./env.js";
 import { startAttendanceDailyCron } from "./jobs/attendance-cron.js";
 import { admissionsRouter } from "./routes/admissions.js";
 import { agentRouter } from "./routes/agent.js";
+import { authRouter } from "./routes/auth.js";
+import { lookupsRouter } from "./routes/lookups.js";
+import { teacherRouter } from "./routes/teacher.js";
+import { teacherUploadsRouter } from "./routes/teacher-uploads.js";
+import { quizzesRouter } from "./routes/quizzes.js";
+import { analyticsRouter } from "./routes/analytics.js";
 import { webhookRouter } from "./routes/webhook.js";
 
 const app = new Hono();
@@ -34,6 +40,17 @@ app.route("/", agentRouter);
 
 // Admissions kiosk (Phase 2) LLM endpoints.
 app.route("/", admissionsRouter);
+
+// Public read-only lookups — kiosk dropdowns for school + classroom.
+app.route("/", lookupsRouter);
+
+// Teacher dashboard: POST /auth/teacher/login is public; everything under
+// /teacher/* is JWT-protected via middleware inside teacherRouter.
+app.route("/", authRouter);
+app.route("/", teacherRouter);
+app.route("/", teacherUploadsRouter);
+app.route("/", quizzesRouter);
+app.route("/", analyticsRouter);
 
 serve({ fetch: app.fetch, port: env.PORT });
 

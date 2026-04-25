@@ -6,6 +6,8 @@ export const webhookRouter = new Hono();
 
 webhookRouter.post("/webhook", async (c) => {
   const body = await c.req.parseBody();
+  console.log("[webhook] incoming:", c.req);
+
   console.log("[webhook] incoming:", body);
 
   const from = typeof body["From"] === "string" ? body["From"] : "";

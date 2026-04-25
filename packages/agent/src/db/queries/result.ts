@@ -4,7 +4,9 @@ export type ErrorCode =
   | "UNAUTHORIZED"
   | "AMBIGUOUS_NAME"
   | "INVALID_INPUT"
-  | "DB_ERROR";
+  | "DB_ERROR"
+  | "LLM_ERROR"
+  | "CONFIG_ERROR";
 
 export type Result<T> =
   | { success: true; data: T }

@@ -39,7 +39,11 @@ const IntakeProfileSchema = AdmissionProfileSchema.extend({
 
 const IntakeSchema = z.object({
   schoolId: z.number().int().positive(),
-  classroomId: z.number().int().positive(),
+  /**
+   * Grade label, e.g. "Grade 5A". The student will be enrolled in
+   * every classroom row in this school whose `name` matches.
+   */
+  grade: z.string().min(1).max(80),
   profile: IntakeProfileSchema,
   parentUsername: z.string().min(3).max(64).optional(),
   studentUsername: z.string().min(3).max(64).optional(),
@@ -63,7 +67,7 @@ admissionsRouter.post("/admissions/phase2/intake", async (c) => {
   try {
     intake = await upsertAdmissionsIntake({
       schoolId: parsed.data.schoolId,
-      classroomId: parsed.data.classroomId,
+      grade: parsed.data.grade,
       parentName: parsed.data.profile.parentName,
       parentPhoneE164: parsed.data.profile.parentPhoneE164,
       studentName: parsed.data.profile.studentName,

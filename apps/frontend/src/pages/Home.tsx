@@ -50,6 +50,27 @@ export function HomePage() {
           tone="emerald"
           pills={["intake", "questions", "analyze"]}
         />
+        <NavCard
+          to="/teacher/login"
+          title="Teacher dashboard"
+          subtitle="Sign in to view students, upload attendance + marks, and create AI quizzes."
+          tone="blue"
+          pills={["students", "attendance", "quizzes"]}
+        />
+        <NavCard
+          to="/student"
+          title="Student portal"
+          subtitle="Sign in with your username to take quizzes published by your teachers."
+          tone="blue"
+          pills={["quizzes", "reports"]}
+        />
+        <NavCard
+          to="/simulation"
+          title="Live demo simulation"
+          subtitle="Phase-by-phase buttons to walk an audience through the full admissions pipeline."
+          tone="emerald"
+          pills={["phase 1–4", "end-to-end"]}
+        />
       </div>
 
       <footer className="mt-16 border-t border-slate-200 pt-6 text-xs text-slate-500">
