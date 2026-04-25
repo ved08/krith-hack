@@ -127,7 +127,12 @@ function reducer(state: State, action: Action): State {
         answers: { ...state.answers, [action.questionId]: action.value },
       };
     case "ANALYZE_START":
-      return { ...state, step: "analyzing", submitting: true, analyzeError: null };
+      return {
+        ...state,
+        step: "analyzing",
+        submitting: true,
+        analyzeError: null,
+      };
     case "ANALYZE_DONE":
       return {
         ...state,
@@ -155,7 +160,7 @@ export function KioskPage() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-10 text-slate-900">
       <Header step={state.step} />
 
       {state.step === "intake" ? (
@@ -165,7 +170,10 @@ export function KioskPage() {
       ) : state.step === "analyzing" ? (
         <AnalyzingStep />
       ) : state.evaluation ? (
-        <CertificateStep evaluation={state.evaluation} onReset={() => dispatch({ type: "RESET" })} />
+        <CertificateStep
+          evaluation={state.evaluation}
+          onReset={() => dispatch({ type: "RESET" })}
+        />
       ) : null}
     </div>
   );
@@ -184,7 +192,10 @@ function Header({ step }: { step: Step }) {
   return (
     <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
       <div>
-        <Link to="/" className="text-xs font-semibold tracking-widest text-slate-500 hover:text-slate-700">
+        <Link
+          to="/"
+          className="text-xs font-semibold tracking-widest text-slate-500 hover:text-slate-900"
+        >
           ← HOME
         </Link>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">
@@ -199,7 +210,11 @@ function Header({ step }: { step: Step }) {
             <li
               key={s.id}
               className={`flex items-center gap-2 text-xs font-medium ${
-                active ? "text-slate-900" : done ? "text-emerald-700" : "text-slate-400"
+                active
+                  ? "text-slate-900"
+                  : done
+                    ? "text-emerald-600"
+                    : "text-slate-500"
               }`}
             >
               <span
@@ -207,14 +222,16 @@ function Header({ step }: { step: Step }) {
                   active
                     ? "bg-slate-900 text-white"
                     : done
-                    ? "bg-emerald-600 text-white"
-                    : "bg-slate-100 text-slate-500"
+                      ? "bg-emerald-600 text-white"
+                      : "bg-slate-100 text-slate-600"
                 }`}
               >
                 {done ? "✓" : i + 1}
               </span>
               {s.label}
-              {i < steps.length - 1 ? <span className="text-slate-300">›</span> : null}
+              {i < steps.length - 1 ? (
+                <span className="text-slate-400">›</span>
+              ) : null}
             </li>
           );
         })}
@@ -302,7 +319,10 @@ function IntakeStep({
     dispatch({ type: "SUBMIT_START" });
     const res = await submitAdmissionsIntake(body);
     if (!res.success) {
-      dispatch({ type: "INTAKE_ERROR", message: `${res.error.code}: ${res.error.message}` });
+      dispatch({
+        type: "INTAKE_ERROR",
+        message: `${res.error.code}: ${res.error.message}`,
+      });
       return;
     }
     dispatch({ type: "INTAKE_DONE", payload: res.data });
@@ -317,25 +337,39 @@ function IntakeStep({
 
       {state.intakeError ? (
         <div className="mb-4">
-          <Banner kind="error" title="Intake failed" message={state.intakeError} />
+          <Banner
+            kind="error"
+            title="Intake failed"
+            message={state.intakeError}
+          />
         </div>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <FieldWrapper
           label="School"
-          hint={schoolsError ? `Could not load schools: ${schoolsError}` : "Pick from existing schools"}
+          hint={
+            schoolsError
+              ? `Could not load schools: ${schoolsError}`
+              : "Pick from existing schools"
+          }
           error={errors.schoolId}
         >
           <Select
             value={state.form.schoolId}
             onChange={(e) =>
-              dispatch({ type: "UPDATE_FIELD", key: "schoolId", value: e.target.value })
+              dispatch({
+                type: "UPDATE_FIELD",
+                key: "schoolId",
+                value: e.target.value,
+              })
             }
             invalid={!!errors.schoolId}
             disabled={!schools}
           >
-            <option value="">{schools ? "Select a school…" : "Loading schools…"}</option>
+            <option value="">
+              {schools ? "Select a school…" : "Loading schools…"}
+            </option>
             {schools?.map((s) => (
               <option key={s.id} value={String(s.id)}>
                 {s.name} (#{s.id})
@@ -349,17 +383,21 @@ function IntakeStep({
             gradesError
               ? `Could not load grades: ${gradesError}`
               : !state.form.schoolId
-              ? "Pick a school first"
-              : selectedGrade
-              ? `Will enroll in ${selectedGrade.classroomCount} classes (${selectedGrade.subjects.join(", ")})`
-              : "Pick the student's grade"
+                ? "Pick a school first"
+                : selectedGrade
+                  ? `Will enroll in ${selectedGrade.classroomCount} classes (${selectedGrade.subjects.join(", ")})`
+                  : "Pick the student's grade"
           }
           error={errors.grade}
         >
           <Select
             value={state.form.grade}
             onChange={(e) =>
-              dispatch({ type: "UPDATE_FIELD", key: "grade", value: e.target.value })
+              dispatch({
+                type: "UPDATE_FIELD",
+                key: "grade",
+                value: e.target.value,
+              })
             }
             invalid={!!errors.grade}
             disabled={!state.form.schoolId || gradesLoading || !grades}
@@ -368,14 +406,15 @@ function IntakeStep({
               {!state.form.schoolId
                 ? "Select a school first"
                 : gradesLoading
-                ? "Loading grades…"
-                : grades && grades.length === 0
-                ? "No grades configured for this school yet"
-                : "Select a grade…"}
+                  ? "Loading grades…"
+                  : grades && grades.length === 0
+                    ? "No grades configured for this school yet"
+                    : "Select a grade…"}
             </option>
             {grades?.map((g) => (
               <option key={g.grade} value={g.grade}>
-                {g.grade} — {g.classroomCount} class{g.classroomCount === 1 ? "" : "es"}
+                {g.grade} — {g.classroomCount} class
+                {g.classroomCount === 1 ? "" : "es"}
               </option>
             ))}
           </Select>
@@ -384,7 +423,13 @@ function IntakeStep({
           <Input
             value={state.form.studentName}
             placeholder="Aarav Kumar"
-            onChange={(e) => dispatch({ type: "UPDATE_FIELD", key: "studentName", value: e.target.value })}
+            onChange={(e) =>
+              dispatch({
+                type: "UPDATE_FIELD",
+                key: "studentName",
+                value: e.target.value,
+              })
+            }
             invalid={!!errors.studentName}
           />
         </FieldWrapper>
@@ -392,7 +437,13 @@ function IntakeStep({
           <Input
             value={state.form.parentName}
             placeholder="Neha Kumar"
-            onChange={(e) => dispatch({ type: "UPDATE_FIELD", key: "parentName", value: e.target.value })}
+            onChange={(e) =>
+              dispatch({
+                type: "UPDATE_FIELD",
+                key: "parentName",
+                value: e.target.value,
+              })
+            }
             invalid={!!errors.parentName}
           />
         </FieldWrapper>
@@ -403,7 +454,13 @@ function IntakeStep({
         >
           <Input
             value={state.form.parentPhoneE164}
-            onChange={(e) => dispatch({ type: "UPDATE_FIELD", key: "parentPhoneE164", value: e.target.value })}
+            onChange={(e) =>
+              dispatch({
+                type: "UPDATE_FIELD",
+                key: "parentPhoneE164",
+                value: e.target.value,
+              })
+            }
             invalid={!!errors.parentPhoneE164}
             inputMode="tel"
             autoComplete="tel"
@@ -416,7 +473,13 @@ function IntakeStep({
         >
           <Input
             value={state.form.studentPhoneE164}
-            onChange={(e) => dispatch({ type: "UPDATE_FIELD", key: "studentPhoneE164", value: e.target.value })}
+            onChange={(e) =>
+              dispatch({
+                type: "UPDATE_FIELD",
+                key: "studentPhoneE164",
+                value: e.target.value,
+              })
+            }
             invalid={!!errors.studentPhoneE164}
             inputMode="tel"
           />
@@ -424,26 +487,48 @@ function IntakeStep({
         <FieldWrapper label="Current class" error={errors.currentClass}>
           <Input
             value={state.form.currentClass}
-            onChange={(e) => dispatch({ type: "UPDATE_FIELD", key: "currentClass", value: e.target.value })}
+            onChange={(e) =>
+              dispatch({
+                type: "UPDATE_FIELD",
+                key: "currentClass",
+                value: e.target.value,
+              })
+            }
             invalid={!!errors.currentClass}
           />
         </FieldWrapper>
         <FieldWrapper label="School name (optional)">
           <Input
             value={state.form.schoolName}
-            onChange={(e) => dispatch({ type: "UPDATE_FIELD", key: "schoolName", value: e.target.value })}
+            onChange={(e) =>
+              dispatch({
+                type: "UPDATE_FIELD",
+                key: "schoolName",
+                value: e.target.value,
+              })
+            }
           />
         </FieldWrapper>
         <FieldWrapper label="Preferred language (optional)">
           <Input
             value={state.form.preferredLanguage}
-            onChange={(e) => dispatch({ type: "UPDATE_FIELD", key: "preferredLanguage", value: e.target.value })}
+            onChange={(e) =>
+              dispatch({
+                type: "UPDATE_FIELD",
+                key: "preferredLanguage",
+                value: e.target.value,
+              })
+            }
           />
         </FieldWrapper>
       </div>
 
       <div className="mt-6 flex items-center justify-end gap-3">
-        <Button onClick={onSubmit} loading={state.submitting} disabled={!canSubmit}>
+        <Button
+          onClick={onSubmit}
+          loading={state.submitting}
+          disabled={!canSubmit}
+        >
           Save intake & generate questions
         </Button>
       </div>
@@ -535,7 +620,8 @@ function QuestionsStep({
         // demo answer is an attempt phrased like a student.
         simulated[q.id] = `I would pick the first option. ${q.rubricHint}`;
       } else {
-        simulated[q.id] = `Sample answer demonstrating familiarity with ${q.competency}. ${q.rubricHint}`;
+        simulated[q.id] =
+          `Sample answer demonstrating familiarity with ${q.competency}. ${q.rubricHint}`;
       }
     }
     // Reflect the simulated answers in the UI so the teacher can see
@@ -564,7 +650,11 @@ function QuestionsStep({
           title="Intake saved, but questions failed to generate"
           message={state.questionSetError}
           action={
-            <Button variant="secondary" onClick={regenerate} loading={state.submitting}>
+            <Button
+              variant="secondary"
+              onClick={regenerate}
+              loading={state.submitting}
+            >
               Retry questions
             </Button>
           }
@@ -572,7 +662,11 @@ function QuestionsStep({
       ) : null}
 
       {state.analyzeError ? (
-        <Banner kind="error" title="Analysis failed" message={state.analyzeError} />
+        <Banner
+          kind="error"
+          title="Analysis failed"
+          message={state.analyzeError}
+        />
       ) : null}
 
       {!qs ? (
@@ -588,10 +682,7 @@ function QuestionsStep({
       ) : (
         <>
           <Card>
-            <CardHeader
-              title="Baseline questions"
-              subtitle={qs.rationale}
-            />
+            <CardHeader title="Baseline questions" subtitle={qs.rationale} />
             <div className="mb-4 flex flex-wrap gap-1.5">
               <Pill tone="slate">grade band: {qs.gradeBand}</Pill>
               <Pill tone="slate">model: {qs.model}</Pill>
@@ -605,7 +696,9 @@ function QuestionsStep({
               question={q}
               index={idx}
               value={state.answers[q.id] ?? ""}
-              onChange={(v) => dispatch({ type: "UPDATE_ANSWER", questionId: q.id, value: v })}
+              onChange={(v) =>
+                dispatch({ type: "UPDATE_ANSWER", questionId: q.id, value: v })
+              }
             />
           ))}
 
@@ -659,11 +752,17 @@ function QuestionCard({
           <div className="text-xs font-semibold tracking-widest text-slate-400">
             Q{index + 1} · {question.id}
           </div>
-          <p className="mt-1 text-base font-medium text-slate-900">{question.question}</p>
+          <p className="mt-1 text-base font-medium text-slate-900">
+            {question.question}
+          </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <Pill tone={competencyTone[question.competency]}>{question.competency}</Pill>
-          <Pill tone={difficultyTone[question.difficulty]}>{question.difficulty}</Pill>
+          <Pill tone={competencyTone[question.competency]}>
+            {question.competency}
+          </Pill>
+          <Pill tone={difficultyTone[question.difficulty]}>
+            {question.difficulty}
+          </Pill>
         </div>
       </div>
       {question.answerType === "number" ? (
@@ -704,7 +803,8 @@ function IntakeSummary({
           </h3>
           <p className="mt-1 text-sm text-slate-600">
             Parent user #{data.parentUserId}
-            {data.parentCreated ? " (new)" : ""} · Student user #{data.studentUserId}
+            {data.parentCreated ? " (new)" : ""} · Student user #
+            {data.studentUserId}
             {data.studentCreated ? " (new)" : ""}
           </p>
         </div>
@@ -745,8 +845,10 @@ function AnalyzingStep() {
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white">
         <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
       </div>
-      <h2 className="text-lg font-semibold text-slate-900">Analyzing responses…</h2>
-      <p className="mt-1 text-sm text-slate-500">
+      <h2 className="text-lg font-semibold text-slate-900">
+        Analyzing responses…
+      </h2>
+      <p className="mt-1 text-sm text-slate-600">
         Running Learning DNA analysis. This usually takes 3–8 seconds.
       </p>
     </Card>
@@ -767,10 +869,10 @@ function CertificateStep({
     analysis.readinessBand === "Advanced"
       ? "violet"
       : analysis.readinessBand === "Proficient"
-      ? "emerald"
-      : analysis.readinessBand === "Developing"
-      ? "amber"
-      : "red";
+        ? "emerald"
+        : analysis.readinessBand === "Developing"
+          ? "amber"
+          : "red";
 
   return (
     <div className="space-y-4">
@@ -778,16 +880,25 @@ function CertificateStep({
         <div className="text-xs font-semibold tracking-widest text-slate-300">
           LEARNING DNA — {profile.studentName}
         </div>
-        <h2 className="mt-2 text-3xl font-semibold">{analysis.certificateHeadline}</h2>
+        <h2 className="mt-2 text-3xl font-semibold">
+          {analysis.certificateHeadline}
+        </h2>
         <div className="mt-5 grid grid-cols-3 gap-4">
-          <Stat label="Overall" value={`${analysis.overallScore}`} suffix="/100" />
+          <Stat
+            label="Overall"
+            value={`${analysis.overallScore}`}
+            suffix="/100"
+          />
           <Stat label="Readiness" value={analysis.readinessBand} />
-          <Stat label="Confidence" value={`${analysis.confidence}`} suffix="%" />
+          <Stat
+            label="Confidence"
+            value={`${analysis.confidence}`}
+            suffix="%"
+          />
         </div>
       </Card>
 
       <DeliveryCard evaluation={evaluation} />
-
 
       <Card>
         <CardHeader title="Summary" />
@@ -799,7 +910,11 @@ function CertificateStep({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <ListCard title="Strengths" items={analysis.strengths} tone="emerald" />
-        <ListCard title="Growth areas" items={analysis.growthAreas} tone="amber" />
+        <ListCard
+          title="Growth areas"
+          items={analysis.growthAreas}
+          tone="amber"
+        />
       </div>
 
       <Card>
@@ -858,7 +973,8 @@ function CertificateStep({
 }
 
 function DeliveryCard({ evaluation }: { evaluation: AdmissionsEvaluation }) {
-  const { certificateUrl, whatsappDelivery, whatsappError, profile } = evaluation;
+  const { certificateUrl, whatsappDelivery, whatsappError, profile } =
+    evaluation;
 
   const whatsapp = {
     sent: {
@@ -931,7 +1047,9 @@ function DeliveryCard({ evaluation }: { evaluation: AdmissionsEvaluation }) {
             <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
               WhatsApp → parent
             </div>
-            <div className="text-sm font-medium text-slate-900">{whatsapp.title}</div>
+            <div className="text-sm font-medium text-slate-900">
+              {whatsapp.title}
+            </div>
             <div className="mt-0.5 text-sm text-slate-600">{whatsapp.note}</div>
           </div>
           <Pill tone={whatsapp.tone}>{whatsappDelivery}</Pill>
@@ -957,7 +1075,9 @@ function Stat({
       </div>
       <div className="mt-1 text-2xl font-semibold">
         {value}
-        {suffix ? <span className="ml-1 text-sm text-slate-300">{suffix}</span> : null}
+        {suffix ? (
+          <span className="ml-1 text-sm text-slate-300">{suffix}</span>
+        ) : null}
       </div>
     </div>
   );
@@ -994,20 +1114,25 @@ function SkillBar({ skill }: { skill: SkillBreakdown }) {
     skill.score >= 80
       ? "bg-emerald-500"
       : skill.score >= 60
-      ? "bg-blue-500"
-      : skill.score >= 40
-      ? "bg-amber-500"
-      : "bg-red-500";
+        ? "bg-blue-500"
+        : skill.score >= 40
+          ? "bg-amber-500"
+          : "bg-red-500";
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-sm">
         <span className="font-medium capitalize text-slate-800">
           {skill.competency.replace("-", " ")}
         </span>
-        <span className="font-mono text-xs text-slate-600">{skill.score}/100</span>
+        <span className="font-mono text-xs text-slate-600">
+          {skill.score}/100
+        </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full ${tone}`} style={{ width: `${skill.score}%` }} />
+        <div
+          className={`h-full ${tone}`}
+          style={{ width: `${skill.score}%` }}
+        />
       </div>
       <div className="mt-1 text-xs text-slate-500">{skill.evidence}</div>
     </div>
@@ -1016,15 +1141,23 @@ function SkillBar({ skill }: { skill: SkillBreakdown }) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-function validateForm(form: State["form"]): Partial<Record<keyof State["form"], string>> {
+function validateForm(
+  form: State["form"],
+): Partial<Record<keyof State["form"], string>> {
   const errors: Partial<Record<keyof State["form"], string>> = {};
-  if (!form.schoolId || Number.isNaN(Number(form.schoolId)) || Number(form.schoolId) <= 0)
+  if (
+    !form.schoolId ||
+    Number.isNaN(Number(form.schoolId)) ||
+    Number(form.schoolId) <= 0
+  )
     errors.schoolId = "positive integer required";
   if (!form.grade.trim()) errors.grade = "pick a grade";
   if (!form.studentName.trim()) errors.studentName = "required";
   if (!form.parentName.trim()) errors.parentName = "required";
-  if (!isValidE164(form.parentPhoneE164)) errors.parentPhoneE164 = "E.164 format, e.g. +919876543210";
-  if (!isValidE164(form.studentPhoneE164)) errors.studentPhoneE164 = "E.164 format, e.g. +919876543211";
+  if (!isValidE164(form.parentPhoneE164))
+    errors.parentPhoneE164 = "E.164 format, e.g. +919876543210";
+  if (!isValidE164(form.studentPhoneE164))
+    errors.studentPhoneE164 = "E.164 format, e.g. +919876543211";
   if (!form.currentClass.trim()) errors.currentClass = "required";
   const qc = Number(form.questionCount);
   if (!Number.isNaN(qc) && qc && (qc < 5 || qc > 12))

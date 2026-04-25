@@ -1,10 +1,10 @@
 type Kind = "error" | "warn" | "info" | "success";
 
 const STYLES: Record<Kind, string> = {
-  error: "bg-red-50 text-red-700 border-red-200",
-  warn: "bg-amber-50 text-amber-800 border-amber-200",
-  info: "bg-slate-50 text-slate-700 border-slate-200",
-  success: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  error: "bg-red-50 text-red-800 border-red-200",
+  warn: "bg-amber-50 text-amber-900 border-amber-200",
+  info: "bg-slate-50 text-slate-900 border-slate-200",
+  success: "bg-emerald-50 text-emerald-900 border-emerald-200",
 };
 
 export function Banner({

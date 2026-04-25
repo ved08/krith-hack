@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Banner } from "../components/Banner.js";
 import { Button } from "../components/Button.js";
 import { Card, CardHeader } from "../components/Card.js";
-import { FieldWrapper, Input, Select, Textarea } from "../components/Field.js";
+import { FieldWrapper, Input } from "../components/Field.js";
 import { Pill } from "../components/Pill.js";
 import {
   fetchQuizForStudent,
@@ -51,16 +51,19 @@ type Step =
 export function StudentPage() {
   const [step, setStep] = useState<Step>({ kind: "login" });
   const [error, setError] = useState<string | null>(null);
+  const [studentMode, setStudentMode] = useState<"existing" | "new">(
+    "existing",
+  );
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <header className="mb-8 flex items-start justify-between gap-4">
+    <div className="mx-auto w-full max-w-full px-6 py-10 bg-white text-slate-900">
+      <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <span className="text-xs font-semibold tracking-widest text-slate-500">
-            STUDENT · QUIZ PORTAL
+            STUDENT ACCESS
           </span>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-            {step.kind === "login" ? "Sign in to take a quiz" : step.lookup.fullName}
+            {step.kind === "login" ? "Student login" : step.lookup.fullName}
           </h1>
           {step.kind !== "login" ? (
             <p className="mt-1 text-sm text-slate-600">
@@ -71,7 +74,11 @@ export function StudentPage() {
                     .map((c) => `${c.subject} · ${c.grade}`)
                     .join(", ")}
             </p>
-          ) : null}
+          ) : (
+            <p className="mt-1 text-sm text-slate-600">
+              Choose existing or new student access below.
+            </p>
+          )}
         </div>
         <Link
           to="/"
@@ -88,17 +95,99 @@ export function StudentPage() {
       ) : null}
 
       {step.kind === "login" ? (
-        <LoginCard
-          onLoggedIn={async (lookup) => {
-            setError(null);
-            const quizzesRes = await fetchStudentQuizzes(lookup.studentId);
-            if (!quizzesRes.success) {
-              setError(quizzesRes.error.message);
-              return;
-            }
-            setStep({ kind: "quizzes", lookup, quizzes: quizzesRes.data });
-          }}
-        />
+        <div className="space-y-6">
+          <section className="w-full grid gap-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-soft lg:grid-cols-[1.4fr_0.9fr]">
+            <div className="space-y-6">
+              <div>
+                <span className="text-xs uppercase tracking-[0.35em] text-slate-500">
+                  Student gateway
+                </span>
+                <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                  Login with your school username
+                </h2>
+                <p className="mt-4 max-w-xl text-base leading-8 text-slate-600">
+                  Use the username your school issued at the kiosk. No password
+                  is required, and you can continue directly to quizzes,
+                  attendance, and reports.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Quick sign in
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Enter your username and continue without extra login steps.
+                  </p>
+                </div>
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Kiosk-friendly
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    New students can follow the kiosk flow to receive their
+                    access.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative h-[360px] overflow-hidden rounded-[2rem] bg-slate-100 shadow-soft">
+              <img
+                src="https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=1100&q=80"
+                alt="Student using learning app"
+                className="h-full w-full object-cover"
+                loading="eager"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent" />
+              <div className="absolute bottom-6 left-6 right-6">
+                <p className="text-sm uppercase tracking-[0.35em] text-slate-500">
+                  Start learning
+                </p>
+                <h3 className="mt-3 text-2xl font-semibold text-slate-900">
+                  Your classroom in one place
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Secure student access with a polished interface and clear next
+                  steps.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button
+              type="button"
+              variant={studentMode === "existing" ? "primary" : "secondary"}
+              onClick={() => setStudentMode("existing")}
+            >
+              Existing student
+            </Button>
+            <Button
+              type="button"
+              variant={studentMode === "new" ? "primary" : "secondary"}
+              onClick={() => setStudentMode("new")}
+            >
+              New student
+            </Button>
+          </div>
+          {studentMode === "existing" ? (
+            <LoginCard
+              onLoggedIn={async (lookup) => {
+                setError(null);
+                const quizzesRes = await fetchStudentQuizzes(lookup.studentId);
+                if (!quizzesRes.success) {
+                  setError(quizzesRes.error.message);
+                  return;
+                }
+                setStep({ kind: "quizzes", lookup, quizzes: quizzesRes.data });
+              }}
+            />
+          ) : (
+            <NewStudentCard />
+          )}
+        </div>
       ) : null}
 
       {step.kind === "quizzes" ? (
@@ -107,23 +196,26 @@ export function StudentPage() {
             <StudentAnalyticsStrip studentId={step.lookup.studentId} />
           </div>
           <QuizzesList
-          lookup={step.lookup}
-          quizzes={step.quizzes}
-          onTake={async (quizId) => {
-            setError(null);
-            const res = await fetchQuizForStudent(step.lookup.studentId, quizId);
-            if (!res.success) {
-              setError(res.error.message);
-              return;
-            }
-            setStep({
-              kind: "taking",
-              lookup: step.lookup,
-              taking: res.data,
-              answers: {},
-            });
-          }}
-          onSignOut={() => setStep({ kind: "login" })}
+            lookup={step.lookup}
+            quizzes={step.quizzes}
+            onTake={async (quizId) => {
+              setError(null);
+              const res = await fetchQuizForStudent(
+                step.lookup.studentId,
+                quizId,
+              );
+              if (!res.success) {
+                setError(res.error.message);
+                return;
+              }
+              setStep({
+                kind: "taking",
+                lookup: step.lookup,
+                taking: res.data,
+                answers: {},
+              });
+            }}
+            onSignOut={() => setStep({ kind: "login" })}
           />
         </>
       ) : null}
@@ -243,9 +335,7 @@ function StudentAnalyticsStrip({ studentId }: { studentId: number }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-800">
-          Your stats
-        </h2>
+        <h2 className="text-sm font-semibold text-slate-800">Your stats</h2>
         <Button
           type="button"
           variant="ghost"
@@ -271,13 +361,7 @@ function StudentAnalyticsStrip({ studentId }: { studentId: number }) {
   );
 }
 
-function MiniStat({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
       <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -317,30 +401,90 @@ function LoginCard({
   }
 
   return (
-    <Card>
-      <CardHeader
-        title="Enter your username"
-        subtitle="This is the username your school issued when you enrolled at the admissions kiosk."
-      />
-      <form onSubmit={onSubmit} className="grid gap-4">
-        <FieldWrapper label="Username">
-          <Input
-            autoFocus
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="e.g. student_arjun_kumar_1234"
-            required
-            minLength={1}
-            maxLength={120}
-          />
-        </FieldWrapper>
-        {error ? <Banner kind="error" message={error} /> : null}
-        <div className="flex justify-end">
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "Loading…" : "Continue"}
-          </Button>
+    <Card className="overflow-hidden w-full bg-white border border-slate-200 shadow-soft">
+      <div className="relative h-64 overflow-hidden">
+        <img
+          src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=80"
+          alt="Studying student"
+          className="h-full w-full object-cover"
+          loading="eager"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/10 to-transparent" />
+        <div className="absolute bottom-5 left-5 text-white">
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-200">
+            Student login
+          </p>
+          <p className="mt-2 text-xl font-semibold tracking-tight">
+            Fast access to your assignments and quizzes.
+          </p>
         </div>
-      </form>
+      </div>
+
+      <div className="p-6 md:p-8">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-slate-900">
+            Enter your username
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            This is the username your school issued when you enrolled at the
+            admissions kiosk.
+          </p>
+        </div>
+        <form onSubmit={onSubmit} className="grid gap-4">
+          <FieldWrapper label="Username">
+            <Input
+              autoFocus
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="e.g. student_arjun_kumar_1234"
+              required
+              minLength={1}
+              maxLength={120}
+            />
+          </FieldWrapper>
+          {error ? <Banner kind="error" message={error} /> : null}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Loading…" : "Continue"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </Card>
+  );
+}
+
+function NewStudentCard() {
+  return (
+    <Card className="bg-white border border-slate-200 shadow-soft">
+      <div className="p-6 md:p-8">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-slate-900">
+            New student access
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Use the kiosk to register and receive your username.
+          </p>
+        </div>
+      </div>
+      <div className="space-y-4 px-6 text-sm text-slate-600">
+        <p>
+          New students should complete the admissions kiosk so the school can
+          assign a username and enroll you in classes.
+        </p>
+        <p>
+          After kiosk registration, come back here and use Existing student to
+          sign in.
+        </p>
+      </div>
+      <div className="mt-6 flex justify-end">
+        <Link
+          to="/kiosk"
+          className="inline-flex rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
+        >
+          Go to kiosk
+        </Link>
+      </div>
     </Card>
   );
 }
@@ -563,7 +707,9 @@ function QuizResult({
         <div className="text-4xl font-bold text-slate-900">
           {result.score} / {result.maxScore}
         </div>
-        <div className="text-sm text-slate-600">{result.percentage.toFixed(1)}%</div>
+        <div className="text-sm text-slate-600">
+          {result.percentage.toFixed(1)}%
+        </div>
       </div>
 
       <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
@@ -572,7 +718,10 @@ function QuizResult({
         </div>
         <PerQuestionBar
           scored={result.analysis.scoredQuestions}
-          questions={taking.questions.map((q) => ({ id: q.id, points: q.points }))}
+          questions={taking.questions.map((q) => ({
+            id: q.id,
+            points: q.points,
+          }))}
         />
       </div>
 

@@ -42,7 +42,10 @@ export function ChatPage() {
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+    listRef.current?.scrollTo({
+      top: listRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [turns.length, sending]);
 
   const phoneValid = isValidE164(phone);
@@ -96,15 +99,21 @@ export function ChatPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-full max-w-3xl flex-col px-4 py-10">
+    <div className="mx-auto flex min-h-full max-w-3xl flex-col px-4 py-10 text-slate-900">
       <header className="mb-6">
-        <Link to="/" className="text-xs font-semibold tracking-widest text-slate-500 hover:text-slate-700">
+        <Link
+          to="/"
+          className="text-xs font-semibold tracking-widest text-slate-500 hover:text-slate-900"
+        >
           ← HOME
         </Link>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">Parent Chat</h1>
+        <h1 className="mt-2 text-3xl font-semibold text-slate-900">
+          Parent Chat
+        </h1>
         <p className="mt-1 text-sm text-slate-600">
           Simulates a WhatsApp conversation. Pick a seeded phone or enter one
-          that is registered in <code className="rounded bg-slate-100 px-1 text-xs">users</code>.
+          that is registered in{" "}
+          <code className="rounded bg-slate-100 px-1 text-xs">users</code>.
         </p>
       </header>
 
@@ -115,7 +124,11 @@ export function ChatPage() {
         />
         <FieldWrapper
           label="Phone (E.164)"
-          error={phoneValid ? undefined : "Must be +<country><digits>, e.g. +919876543210"}
+          error={
+            phoneValid
+              ? undefined
+              : "Must be +<country><digits>, e.g. +919876543210"
+          }
         >
           <Input
             value={phone}
@@ -160,7 +173,7 @@ export function ChatPage() {
           className="min-h-[240px] max-h-[460px] flex-1 space-y-3 overflow-y-auto rounded-xl bg-slate-50 p-4"
         >
           {turns.length === 0 && !sending ? (
-            <div className="py-10 text-center text-sm text-slate-400">
+            <div className="py-10 text-center text-sm text-slate-500">
               Send a message to start the conversation.
             </div>
           ) : null}
@@ -183,7 +196,7 @@ export function ChatPage() {
                 key={s}
                 type="button"
                 onClick={() => setDraft(s)}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:border-slate-400 hover:bg-slate-50"
+                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500 hover:border-slate-400 hover:bg-slate-50"
               >
                 {s}
               </button>
@@ -202,11 +215,15 @@ export function ChatPage() {
                 }
               }}
             />
-            <Button onClick={() => void send()} loading={sending} disabled={!canSend}>
+            <Button
+              onClick={() => void send()}
+              loading={sending}
+              disabled={!canSend}
+            >
               Send
             </Button>
           </div>
-          <div className="mt-1 text-right text-xs text-slate-400">
+          <div className="mt-1 text-right text-xs text-slate-500">
             ⌘/Ctrl + Enter to send
           </div>
         </div>
@@ -219,14 +236,16 @@ function Bubble({ turn }: { turn: Turn }) {
   const isUser = turn.role === "user";
   const isSystem = turn.role === "system";
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"} animate-fade-in`}>
+    <div
+      className={`flex ${isUser ? "justify-end" : "justify-start"} animate-fade-in`}
+    >
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
           isUser
             ? "rounded-br-sm bg-slate-900 text-white"
             : isSystem
-            ? "rounded-bl-sm bg-red-50 text-red-700"
-            : "rounded-bl-sm bg-white text-slate-800"
+              ? "rounded-bl-sm bg-red-50 text-red-700"
+              : "rounded-bl-sm bg-white text-slate-800"
         }`}
       >
         {turn.canned ? (
@@ -240,7 +259,10 @@ function Bubble({ turn }: { turn: Turn }) {
         <div
           className={`mt-1 text-[10px] ${isUser ? "text-slate-300" : "text-slate-400"}`}
         >
-          {new Date(turn.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          {new Date(turn.at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </div>
       </div>
     </div>

@@ -177,7 +177,8 @@ export function SimulationPage() {
       } else if (q.answerType === "mcq") {
         answers[q.id] = `I would pick the first option. ${q.rubricHint}`;
       } else {
-        answers[q.id] = `Sample answer demonstrating familiarity with ${q.competency}. ${q.rubricHint}`;
+        answers[q.id] =
+          `Sample answer demonstrating familiarity with ${q.competency}. ${q.rubricHint}`;
       }
     }
     setState({
@@ -194,12 +195,14 @@ export function SimulationPage() {
     if (state.kind !== "answered") return;
     setError(null);
     setBusy("p4");
-    const responses: CandidateResponse[] = state.questionSet.questions.map((q) => ({
-      questionId: q.id,
-      question: q.question,
-      competency: q.competency,
-      answer: state.answers[q.id] ?? "",
-    }));
+    const responses: CandidateResponse[] = state.questionSet.questions.map(
+      (q) => ({
+        questionId: q.id,
+        question: q.question,
+        competency: q.competency,
+        answer: state.answers[q.id] ?? "",
+      }),
+    );
     const res = await analyzeAdmissionsResponses({
       profile: {
         studentName: form.studentName,
@@ -242,7 +245,7 @@ export function SimulationPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
+    <div className="mx-auto max-w-4xl px-4 py-10 text-slate-900 bg-white">
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
           <span className="text-xs font-semibold tracking-widest text-slate-500">
@@ -259,7 +262,7 @@ export function SimulationPage() {
         </div>
         <Link
           to="/"
-          className="text-sm text-slate-600 underline hover:text-slate-900"
+          className="text-sm text-slate-500 underline hover:text-slate-900"
         >
           Home
         </Link>
@@ -411,7 +414,8 @@ export function SimulationPage() {
         </Card>
       ) : null}
 
-      {phaseReached.p2 && (state.kind === "intake" ||
+      {phaseReached.p2 &&
+      (state.kind === "intake" ||
         state.kind === "answered" ||
         state.kind === "analyzed") ? (
         <Card className="mb-4 border-emerald-200 bg-emerald-50/40">
@@ -420,12 +424,16 @@ export function SimulationPage() {
           </h3>
           <div className="grid gap-1 text-xs text-slate-700">
             <div>
-              Student #{state.intake.intake.studentUserId} · Parent #{state.intake.intake.parentUserId}
+              Student #{state.intake.intake.studentUserId} · Parent #
+              {state.intake.intake.parentUserId}
             </div>
             <div>
-              Enrolled in {state.intake.intake.classroomEnrollmentsCreated} class
-              {state.intake.intake.classroomEnrollmentsCreated === 1 ? "" : "es"} ·{" "}
-              {state.intake.intake.grade}
+              Enrolled in {state.intake.intake.classroomEnrollmentsCreated}{" "}
+              class
+              {state.intake.intake.classroomEnrollmentsCreated === 1
+                ? ""
+                : "es"}{" "}
+              · {state.intake.intake.grade}
             </div>
             {state.intake.questionSet ? (
               <div>
@@ -457,7 +465,9 @@ export function SimulationPage() {
             {state.questionSet.questions.map((q) => (
               <li key={q.id}>
                 <span className="font-semibold">{q.id}:</span>{" "}
-                <span className="text-slate-500">{q.question.slice(0, 60)}</span>
+                <span className="text-slate-400">
+                  {q.question.slice(0, 60)}
+                </span>
                 <div className="ml-4 text-slate-900">
                   → {state.answers[q.id]}
                 </div>
@@ -483,8 +493,8 @@ export function SimulationPage() {
                 state.evaluation.whatsappDelivery === "sent"
                   ? "emerald"
                   : state.evaluation.whatsappDelivery === "dry_run"
-                  ? "amber"
-                  : "slate"
+                    ? "amber"
+                    : "slate"
               }
             >
               whatsapp: {state.evaluation.whatsappDelivery}
@@ -544,8 +554,8 @@ function PhaseButton({
         done
           ? "border-emerald-300 bg-emerald-50 text-emerald-900"
           : disabled
-          ? "border-slate-200 bg-slate-50 text-slate-400"
-          : "border-slate-900 bg-slate-900 text-white hover:bg-slate-800"
+            ? "border-slate-200 bg-slate-50 text-slate-400"
+            : "border-slate-900 bg-slate-900 text-white hover:bg-slate-800"
       }`}
     >
       <div className="flex items-center gap-2 text-sm font-semibold">
