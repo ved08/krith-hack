@@ -245,14 +245,14 @@ export function SimulationPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 text-slate-900 bg-white">
+    <div className="mx-auto max-w-4xl px-4 py-12 text-slate-900 bg-paper-50">
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <span className="text-xs font-semibold tracking-widest text-slate-500">
-            LIVE DEMO · SIMULATION
+          <span className="text-[11px] uppercase tracking-[0.35em] text-slate-500">
+            Live Demo · Simulation
           </span>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-            Full admissions pipeline
+          <h1 className="mt-3 font-display text-4xl tracking-editorial text-slate-900">
+            Full <em className="text-primary-700">admissions</em> pipeline
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
             Four buttons, one per phase. Click them in order during the demo so

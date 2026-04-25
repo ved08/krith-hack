@@ -78,31 +78,35 @@ export function TeacherDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-paper-50 text-slate-900">
       <Navigation />
 
-      <div className="pt-20 pb-20 px-4 lg:px-8">
+      <div className="pt-24 pb-20 px-4 lg:px-8">
         <div className="container mx-auto max-w-6xl">
           {/* Header */}
           <div className="mb-10 animate-fade-in">
             <div className="flex items-start justify-between gap-4 mb-2">
               <div>
-                <span className="inline-block px-3 py-1 rounded-full bg-primary-100 text-primary-700 text-xs font-bold mb-3">
-                  👨‍🏫 TEACHER DASHBOARD
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 border border-primary-200 text-primary-700 text-[10px] uppercase tracking-[0.18em] font-medium mb-4">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary-500" />
+                  Teacher Dashboard
                 </span>
-                <h1 className="text-5xl font-bold text-slate-900 mb-2">
-                  Welcome back, {teacher?.fullName?.split(" ")[0]}
+                <h1 className="font-display text-5xl tracking-editorial text-slate-900 mb-2">
+                  Welcome back,{" "}
+                  <em className="text-primary-700">
+                    {teacher?.fullName?.split(" ")[0]}
+                  </em>
                 </h1>
-                <p className="text-lg text-slate-600">
-                  {teacher?.schoolName} •{" "}
-                  <span className="font-mono text-sm text-slate-500">
+                <p className="text-base text-slate-600">
+                  {teacher?.schoolName} ·{" "}
+                  <span className="font-mono text-xs text-slate-500">
                     @{teacher?.username}
                   </span>
                 </p>
               </div>
               <button
                 onClick={onSignOut}
-                className="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors text-sm font-medium"
+                className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors text-sm font-medium"
               >
                 Sign out
               </button>
@@ -186,9 +190,11 @@ function ClassroomsCard({
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-slate-900">My Classes</h2>
-          <p className="text-slate-600 mt-1">
-            Manage your classrooms and upload attendance/marks
+          <h2 className="font-display text-4xl tracking-editorial text-slate-900">
+            My <em className="text-primary-700">classes</em>
+          </h2>
+          <p className="text-slate-600 mt-1.5 text-sm">
+            Manage your classrooms and upload attendance or marks.
           </p>
         </div>
         <Button variant="primary" size="lg" onClick={onAdd}>
@@ -364,9 +370,11 @@ function StudentsCard({
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-slate-900">My Students</h2>
-          <p className="text-slate-600 mt-1">
-            {students.length} total students across all classes
+          <h2 className="font-display text-4xl tracking-editorial text-slate-900">
+            My <em className="text-primary-700">students</em>
+          </h2>
+          <p className="text-slate-600 mt-1.5 text-sm">
+            {students.length} total students across all classes.
           </p>
         </div>
       </div>

@@ -56,14 +56,20 @@ export function StudentPage() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-full px-6 py-10 bg-white text-slate-900">
+    <div className="mx-auto w-full max-w-full px-6 py-12 bg-paper-50 text-slate-900">
       <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <span className="text-xs font-semibold tracking-widest text-slate-500">
-            STUDENT ACCESS
+          <span className="text-[11px] uppercase tracking-[0.35em] text-slate-500">
+            Student Access
           </span>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-            {step.kind === "login" ? "Student login" : step.lookup.fullName}
+          <h1 className="mt-3 font-display text-4xl tracking-editorial text-slate-900">
+            {step.kind === "login" ? (
+              <>
+                Student <em className="text-primary-700">login</em>
+              </>
+            ) : (
+              step.lookup.fullName
+            )}
           </h1>
           {step.kind !== "login" ? (
             <p className="mt-1 text-sm text-slate-600">
@@ -102,8 +108,8 @@ export function StudentPage() {
                 <span className="text-xs uppercase tracking-[0.35em] text-slate-500">
                   Student gateway
                 </span>
-                <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-                  Login with your school username
+                <h2 className="mt-4 font-display text-4xl tracking-editorial text-slate-900 sm:text-5xl">
+                  Login with your <em className="text-primary-700">school username</em>
                 </h2>
                 <p className="mt-4 max-w-xl text-base leading-8 text-slate-600">
                   Use the username your school issued at the kiosk. No password

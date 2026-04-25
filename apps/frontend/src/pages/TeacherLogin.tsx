@@ -81,15 +81,25 @@ export function TeacherLoginPage() {
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-md px-4 py-24 bg-white text-slate-900">
+    <div className="mx-auto min-h-screen max-w-md px-4 py-24 bg-paper-50 text-slate-900">
       <header className="mb-8 text-center">
-        <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
+        <p className="text-[11px] uppercase tracking-[0.35em] text-slate-500">
+          <span className="inline-block h-px w-6 align-middle bg-slate-300 mr-3" />
           Teacher Access
+          <span className="inline-block h-px w-6 align-middle bg-slate-300 ml-3" />
         </p>
-        <h1 className="mt-4 text-4xl font-semibold text-slate-900">
-          {mode === "login" ? "Teacher Login" : "Teacher Sign Up"}
+        <h1 className="mt-5 font-display text-5xl tracking-editorial text-slate-900">
+          {mode === "login" ? (
+            <>
+              Teacher <em className="text-primary-700">login</em>
+            </>
+          ) : (
+            <>
+              Teacher <em className="text-primary-700">sign-up</em>
+            </>
+          )}
         </h1>
-        <p className="mt-3 text-sm text-slate-600">
+        <p className="mt-3 text-sm leading-relaxed text-slate-600 text-pretty">
           {mode === "login"
             ? "Sign in with your school username and password."
             : "Create a new teacher account by choosing your school and entering your full name."}

@@ -160,7 +160,7 @@ export function KioskPage() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 text-slate-900">
+    <div className="mx-auto max-w-3xl px-4 py-12 text-slate-900">
       <Header step={state.step} />
 
       {state.step === "intake" ? (
@@ -198,8 +198,9 @@ function Header({ step }: { step: Step }) {
         >
           ← HOME
         </Link>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">
-          Admissions Kiosk — Phase 2
+        <h1 className="mt-2 font-display text-4xl tracking-editorial text-slate-900">
+          Admissions <em className="text-primary-700">Kiosk</em>
+          <span className="ml-2 text-slate-400">— Phase 2</span>
         </h1>
       </div>
       <ol className="flex items-center gap-2">

@@ -11,7 +11,7 @@ import { TeacherLoginPage } from "./pages/TeacherLogin.js";
 export function App() {
   return (
     <AuthProvider>
-      <div className="min-h-screen font-sans text-slate-900 antialiased bg-white">
+      <div className="min-h-screen font-sans text-slate-900 antialiased bg-paper-50">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/kiosk" element={<KioskPage />} />
@@ -37,24 +37,24 @@ export function App() {
 function NotFound() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
-      <div className="text-center space-y-6">
-        <div className="text-8xl font-bold bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">
+      <div className="text-center space-y-6 max-w-md">
+        <div className="font-display text-[10rem] leading-none italic text-slate-900">
           404
         </div>
         <div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-3">
-            Page not found
+          <h1 className="font-display text-4xl text-slate-900 mb-3">
+            Page <em className="text-primary-600">not found</em>
           </h1>
-          <p className="text-xl text-slate-600 mb-8 max-w-md mx-auto">
-            Oops! It looks like you've navigated to a page that doesn't exist.
-            Let's get you back on track.
+          <p className="text-base leading-7 text-slate-600 mb-8 mx-auto">
+            The path you followed doesn't lead anywhere on this campus.
+            Let's get you back to the entrance.
           </p>
         </div>
         <a
           href="/"
-          className="inline-flex items-center justify-center px-8 py-3 rounded-xl bg-gradient-blue text-white font-bold text-lg shadow-glow hover:shadow-lg hover:scale-105 active:scale-95 transition-all duration-300"
+          className="inline-flex items-center justify-center px-7 py-3 rounded-full bg-slate-900 text-paper-50 font-medium text-sm tracking-wide hover:bg-slate-800 active:scale-[0.98] transition-all duration-300"
         >
-          ← Go back home
+          ← Back to home
         </a>
       </div>
     </div>

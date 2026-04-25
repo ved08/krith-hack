@@ -10,28 +10,28 @@ type Variant =
 type Size = "sm" | "md" | "lg" | "xl";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
+  "inline-flex items-center justify-center gap-2 font-medium tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50";
 
 const SIZES: Record<Size, string> = {
-  sm: "rounded-lg px-3 py-1.5 text-xs",
-  md: "rounded-lg px-4 py-2.5 text-sm",
-  lg: "rounded-xl px-6 py-3 text-base",
-  xl: "rounded-xl px-8 py-4 text-lg",
+  sm: "rounded-full px-3 py-1.5 text-xs",
+  md: "rounded-full px-4 py-2 text-sm",
+  lg: "rounded-full px-6 py-2.5 text-sm",
+  xl: "rounded-full px-7 py-3 text-base",
 };
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    "bg-slate-900 text-white shadow-glow hover:bg-slate-800 active:scale-95 focus-visible:ring-slate-500",
+    "bg-slate-900 text-paper-50 shadow-subtle hover:bg-slate-800 active:scale-[0.98] focus-visible:ring-slate-500",
   secondary:
-    "bg-slate-100 text-slate-900 hover:bg-slate-200 active:scale-95 focus-visible:ring-slate-300",
+    "bg-paper-100 text-slate-900 border border-slate-200 hover:bg-slate-100 active:scale-[0.98] focus-visible:ring-slate-300",
   accent:
-    "bg-slate-700 text-white shadow-glow-pink hover:bg-slate-600 active:scale-95 focus-visible:ring-accent-500",
+    "bg-primary-600 text-paper-50 shadow-glow hover:bg-primary-700 active:scale-[0.98] focus-visible:ring-primary-500",
   ghost:
-    "bg-transparent text-slate-900 hover:bg-slate-100 active:scale-95 focus-visible:ring-slate-300",
+    "bg-transparent text-slate-700 hover:bg-slate-100 hover:text-slate-900 active:scale-[0.98] focus-visible:ring-slate-300",
   outline:
-    "border-2 border-slate-300 text-slate-900 hover:bg-slate-100 active:scale-95 focus-visible:ring-slate-300",
+    "border border-slate-300 text-slate-900 bg-transparent hover:bg-slate-50 active:scale-[0.98] focus-visible:ring-slate-300",
   danger:
-    "bg-red-600 text-white shadow-lg hover:bg-red-500 hover:scale-105 active:scale-95 focus-visible:ring-red-500",
+    "bg-accent-600 text-paper-50 hover:bg-accent-700 active:scale-[0.98] focus-visible:ring-accent-500",
 };
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -63,7 +63,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...rest}
       >
         {loading ? (
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
         ) : icon ? (
           icon
         ) : null}

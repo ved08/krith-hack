@@ -99,16 +99,16 @@ export function ChatPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-full max-w-3xl flex-col px-4 py-10 text-slate-900">
+    <div className="mx-auto flex min-h-full max-w-3xl flex-col px-4 py-12 text-slate-900">
       <header className="mb-6">
         <Link
           to="/"
-          className="text-xs font-semibold tracking-widest text-slate-500 hover:text-slate-900"
+          className="text-[11px] font-medium uppercase tracking-[0.25em] text-slate-500 hover:text-slate-900"
         >
-          ← HOME
+          ← Home
         </Link>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">
-          Parent Chat
+        <h1 className="mt-3 font-display text-4xl tracking-editorial text-slate-900">
+          Parent <em className="text-primary-700">chat</em>
         </h1>
         <p className="mt-1 text-sm text-slate-600">
           Simulates a WhatsApp conversation. Pick a seeded phone or enter one
