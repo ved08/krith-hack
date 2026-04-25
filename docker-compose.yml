@@ -1,0 +1,15 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: campus-redis
+    ports:
+      - "6379:6379"
+    # Disable persistence: chat cache is ephemeral (24h TTL) and we don't
+    # want stray dump.rdb files polluting the working tree.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

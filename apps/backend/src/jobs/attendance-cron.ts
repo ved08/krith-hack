@@ -41,7 +41,13 @@ export function startAttendanceDailyCron(options: StartAttendanceCronOptions): v
   );
 }
 
-async function runAttendanceBroadcast(timezone: string): Promise<void> {
+/**
+ * One-shot broadcast runner. Exported so manual-trigger scripts can
+ * invoke the same code path as the scheduler without reaching into
+ * `node-cron` — guarantees the CLI and the cron do exactly the same
+ * thing. Re-entrancy guard (`isRunning`) shared with the scheduler.
+ */
+export async function runAttendanceBroadcast(timezone: string): Promise<void> {
   if (isRunning) {
     console.log("[attendance-cron] previous run still in progress; skipping");
     return;

@@ -7,7 +7,19 @@
 
 // Core entry point: takes a WhatsApp phone + message text, returns a reply.
 export { runAgent } from "./agent/graph.js";
-export type { AgentRunOutcome } from "./agent/graph.js";
+export type { AgentRunOutcome, RunAgentOptions } from "./agent/graph.js";
+
+// Chat service: the unified entry point for any channel (WhatsApp,
+// dashboard tester, future Slack/SMS). Consults the Redis-backed chat
+// history, invokes the agent, and persists the turn. Every HTTP route
+// that wants "talk to the agent" behaviour should call this rather
+// than `runAgent` directly.
+export { handleIncomingMessage } from "./chat/index.js";
+export type {
+  ChatChannel,
+  ChatHandleResult,
+  ChatTurn,
+} from "./chat/index.js";
 
 // Post-agent formatter: takes the raw agent reply + original question and
 // produces a WhatsApp-natural version via a second Gemini call. Safe no-op

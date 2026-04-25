@@ -18,11 +18,12 @@ const FORMATTER_PROMPT = `You are rewriting a school assistant's draft reply for
 
 Hard rules (never violate):
 - Preserve every fact from the draft exactly. Do not invent, add, remove, or change numbers, percentages, dates, names, or subjects.
+- If the draft contains URLs (http://… or https://…), copy each URL VERBATIM. Never abbreviate, shorten, paraphrase, or wrap them. Output the full URL even if it is long.
 - If the draft says "no data" or declines, keep that meaning — don't soften it into a false claim.
 - Output plain text only. No markdown, no bullet points, no emojis unless the parent's question used them.
 
 Style:
-- Warm, natural, WhatsApp-appropriate. Short: 1–3 sentences.
+- Warm, natural, WhatsApp-appropriate. Concise but COMPLETE — never truncate mid-sentence or drop content the parent asked for.
 - No formal greetings ("Dear parent", "Hi there"). Just start with the answer.
 - Match the tone of the parent's question — casual question gets a casual reply.
 - If the draft is already a good WhatsApp message, return it with minimal or no changes.
@@ -45,7 +46,10 @@ export async function formatForWhatsApp(
     apiKey: env.GEMINI_API_KEY,
     model: "gemini-2.5-flash",
     temperature: 0.4,
-    maxOutputTokens: 256,
+    // Bumped from 256 — short replies were fine, but anything that
+    // included a Supabase PDF URL (~140 chars, plus 1–2 sentences of
+    // narration) blew past the old cap and arrived truncated.
+    maxOutputTokens: 1024,
   });
 
   const prompt = FORMATTER_PROMPT.replace("{question}", originalQuestion).replace(
@@ -61,7 +65,21 @@ export async function formatForWhatsApp(
       typeof result.content === "string" ? result.content : JSON.stringify(result.content);
     const cleaned = text.trim();
     console.log(`[formatter] ← final: "${truncate(cleaned, 160)}"`);
-    return cleaned.length > 0 ? cleaned : draftReply;
+    if (cleaned.length === 0) return draftReply;
+
+    // Safety net: if the draft had a URL but the formatter mangled or
+    // dropped it, abandon the polish and ship the raw draft. URLs
+    // surviving intact matters more than tone here.
+    const draftUrls = extractUrls(draftReply);
+    if (draftUrls.length > 0) {
+      const cleanedUrls = extractUrls(cleaned);
+      const allPresent = draftUrls.every((u) => cleanedUrls.includes(u));
+      if (!allPresent) {
+        console.warn("[formatter] URL mismatch detected — returning raw draft");
+        return draftReply;
+      }
+    }
+    return cleaned;
   } catch (e) {
     console.error("[formatter] failed, returning draft:", e);
     return draftReply;
@@ -70,4 +88,11 @@ export async function formatForWhatsApp(
 
 function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n)}…` : s;
+}
+
+function extractUrls(s: string): string[] {
+  // Greedy match of http(s) URLs up to the next whitespace / closing
+  // punctuation. Conservative — better to over-keep than under-keep.
+  const m = s.match(/https?:\/\/[^\s)>\]]+/g);
+  return m ?? [];
 }

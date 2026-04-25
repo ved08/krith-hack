@@ -110,4 +110,13 @@ export const schemas = {
   getChildrenSummary: z.object({}),
 
   listMyLinkedChildren: z.object({}),
+
+  generatePerformanceReport: z.object({
+    studentName: z
+      .string()
+      .optional()
+      .describe(
+        "Child's name — required only when the sender is a parent with 2+ linked children and hasn't been resolved.",
+      ),
+  }),
 } as const;

@@ -1,5 +1,9 @@
 import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import {
+  HumanMessage,
+  SystemMessage,
+  type BaseMessage,
+} from "@langchain/core/messages";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { env } from "../config/env.js";
@@ -12,6 +16,16 @@ export type AgentRunOutcome =
   | { kind: "OK"; reply: string }
   | { kind: "CANNED"; reply: string; reason: "UNKNOWN_SENDER" | "TEACHER_ON_WHATSAPP" | "ERROR" };
 
+export type RunAgentOptions = {
+  /**
+   * Prior conversation turns to prepend to the LLM prompt. Supplied by
+   * the chat cache layer ([chat/service.ts](../chat/service.ts)). When
+   * omitted the agent runs stateless, preserving pre-cache behaviour
+   * for any direct caller that hasn't been migrated.
+   */
+  history?: BaseMessage[];
+};
+
 /**
  * Entry point: take a WhatsApp phone number + the raw message text and
  * return the reply string to send back. Thin wrapper around:
@@ -22,6 +36,7 @@ export type AgentRunOutcome =
 export async function runAgent(
   fromPhoneE164: string,
   messageText: string,
+  opts: RunAgentOptions = {},
 ): Promise<AgentRunOutcome> {
   const outcome = await loadAgentContext(fromPhoneE164);
   if (outcome.kind === "UNKNOWN_SENDER") {
@@ -41,10 +56,12 @@ export async function runAgent(
   const ctx = outcome.context;
   try {
     if (env.MOCK_LLM) {
+      // Mock path is a keyword router — history doesn't help it and
+      // injecting old turns would just confuse the deterministic match.
       const reply = await runMockAgent(ctx, messageText);
       return { kind: "OK", reply };
     }
-    const reply = await runGeminiAgent(ctx, messageText);
+    const reply = await runGeminiAgent(ctx, messageText, opts.history);
     return { kind: "OK", reply };
   } catch (e) {
     console.error("[agent] unexpected failure:", e);
@@ -56,7 +73,11 @@ export async function runAgent(
 // Real agent (Gemini + LangGraph ReAct prebuilt)
 // ---------------------------------------------------------------------------
 
-async function runGeminiAgent(ctx: AgentContext, messageText: string): Promise<string> {
+async function runGeminiAgent(
+  ctx: AgentContext,
+  messageText: string,
+  history: BaseMessage[] = [],
+): Promise<string> {
   if (!env.GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY is required when MOCK_LLM is false");
   }
@@ -85,6 +106,8 @@ async function runGeminiAgent(ctx: AgentContext, messageText: string): Promise<s
     {
       messages: [
         new SystemMessage(SYSTEM_PROMPT),
+        // Prior turns from the chat cache (chronological). May be empty.
+        ...history,
         new HumanMessage(`${preamble}\n\nParent's question: ${messageText}`),
       ],
     },

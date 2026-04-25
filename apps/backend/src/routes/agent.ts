@@ -1,4 +1,4 @@
-import { runAgent } from "@campus/agent";
+import { handleIncomingMessage } from "@campus/agent";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -26,11 +26,15 @@ agentRouter.post("/agent/message", async (c) => {
     );
   }
 
-  const outcome = await runAgent(parsed.data.fromPhoneE164, parsed.data.messageText);
+  const { reply, outcome } = await handleIncomingMessage({
+    phoneE164: parsed.data.fromPhoneE164,
+    text: parsed.data.messageText,
+    channel: "dashboard",
+  });
   return c.json({
     success: true,
     data: {
-      reply: outcome.reply,
+      reply,
       canned: outcome.kind === "CANNED" ? outcome.reason : null,
     },
   });

@@ -1,6 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import * as analytics from "../../db/queries/analytics.js";
 import { getPrimaryClassroomId } from "../../db/queries/classrooms.js";
+import { generateStudentPerformanceReport } from "../../reports/generate-report.js";
 import type { AgentContext } from "../context.js";
 import { descriptions } from "./descriptions.js";
 import { schemas } from "./schemas.js";
@@ -318,6 +319,31 @@ export function buildToolsForRequest(ctx: AgentContext) {
         name: "get_children_summary",
         description: descriptions.get_children_summary,
         schema: schemas.getChildrenSummary,
+      },
+    ),
+
+    // -----------------------------------------------------------------------
+    // Side-effecting: builds + uploads a PDF performance report
+    // -----------------------------------------------------------------------
+    tool(
+      async (args) => {
+        const r = await needStudent(args.studentName, async (studentId) => {
+          const result = await generateStudentPerformanceReport({ studentId });
+          if (!result.success) return result;
+          // Surface the URL + headline stats verbatim so the LLM can
+          // include them in its reply. The LLM is instructed (via
+          // descriptions) to keep the URL intact.
+          return {
+            success: true as const,
+            data: result.data,
+          };
+        });
+        return JSON.stringify(r);
+      },
+      {
+        name: "generate_performance_report",
+        description: descriptions.generate_performance_report,
+        schema: schemas.generatePerformanceReport,
       },
     ),
 
