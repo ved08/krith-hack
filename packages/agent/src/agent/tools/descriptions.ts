@@ -47,6 +47,9 @@ export const descriptions = {
 
   list_my_linked_children:
     "Use ONLY if the sender is a parent with 2+ linked children AND they did NOT name a specific child. Call this first to get the list, then reply asking the parent which child they mean. If the parent named a child, you already have the answer via context — do not call this.",
+
+  generate_performance_report:
+    "Use when the parent asks for a downloadable / printable / shareable report — phrasings like 'send me the report', 'give me a PDF', 'full performance summary', 'progress card', 'detailed report'. Generates a PDF covering attendance + quiz + marks + subject averages, uploads it, and returns a public URL. Include the URL verbatim in your reply so the parent can tap it. Do NOT use for casual questions answered by the read-only tools.",
 } as const;
 
 export type ToolName = keyof typeof descriptions;

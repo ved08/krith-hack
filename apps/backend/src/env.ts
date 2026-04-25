@@ -10,9 +10,12 @@ const EnvSchema = z.object({
     .string()
     .default("3000")
     .transform((v) => Number.parseInt(v, 10)),
+  // Default OFF — run the broadcast manually via
+  // `bun run scripts/run-attendance-broadcast.ts`. Flip to "true" (or
+  // set the env var) only when you genuinely want the daily schedule.
   ATTENDANCE_CRON_ENABLED: z
     .enum(["true", "false"])
-    .default("true")
+    .default("false")
     .transform((v) => v === "true"),
   ATTENDANCE_CRON_EXPRESSION: z.string().default("0 18 * * *"),
   ATTENDANCE_CRON_TIMEZONE: z.string().default("Asia/Kolkata"),

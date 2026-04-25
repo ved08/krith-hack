@@ -40,6 +40,11 @@ const EnvSchema = z.object({
   TWILIO_AUTH_TOKEN: optionalStr,
   // Must include the "whatsapp:" prefix — e.g. "whatsapp:+14155238886".
   TWILIO_WHATSAPP_FROM: optionalStr,
+
+  // Redis for per-user WhatsApp chat history (last 30 exchanges, 24h TTL).
+  // Leave blank to run the agent stateless — everything else still works.
+  // Accepts redis://… so we don't use z.url() (older zod rejects non-http schemes).
+  REDIS_URL: optionalStr,
 });
 
 export const env = EnvSchema.parse(process.env);
