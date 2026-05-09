@@ -249,13 +249,4 @@ bun run typecheck            # typecheck every workspace
 bun run build                # build backend + frontend
 ```
 
----
 
-## Team
-
-| Person | Owns |
-|---|---|
-| Murali Samant | Database schema + Python query tools |
-| Mani Shankar | WhatsApp / Twilio integration + templates |
-| Vedvardhan | Agentic backend (LangGraph + Gemini + scheduler) |
-| Shashipreetham | Dashboard + kiosk frontend |
